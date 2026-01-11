@@ -1,0 +1,29 @@
+[2026-01-02 04:53:12] Verificación de requisitos completada
+W: http://apt.postgresql.org/pub/repos/apt/dists/jammy-pgdg/InRelease: Key is stored in legacy trusted.gpg keyring (/etc/apt/trusted.gpg), see the DEPRECATION section in apt-key(8) for details.
+W: https://packages.microsoft.com/ubuntu/22.04/prod/dists/jammy/InRelease: Key is stored in legacy trusted.gpg keyring (/etc/apt/trusted.gpg), see the DEPRECATION section in apt-key(8) for details.
+Preconfiguring packages ...
+[?1049h[22;0;0t[1;25r[4l[?25l(B[m[37m[40m[1;25r[H[2J[1;1H[97m[45m[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K[1;1H[37mPackage configuration[7;21H[30m[47m┌────────────────────────────────────┤ [31mConfiguring msodbcsql18[30m ├─────────────────────────────────────┐[8;21H│                                                                                                    │[97m[40m [9;21H[30m[47m│ The license terms for this product can be downloaded from https://aka.ms/odbc18eula and found in   │[97m[40m [10;21H[30m[47m│ /usr/share/doc/msodbcsql18/LICENSE.txt.                                                            │[97m[40m [11;21H[30m[47m│                                                                                                    │[97m[40m [12;21H[30m[47m│ By choosing 'Yes', you indicate that you accept the license terms.                                 │[97m[40m [13;21H[30m[47m│                                                                                                    │[97m[40m [14;21H[30m[47m│ Do you accept the license terms?                                                                   │[97m[40m [15;21H[30m[47m│                                                                                                    │[97m[40m [16;21H[30m[47m│                             <Yes>                                [37m[41m<No>[30m[47m                              │[97m[40m [17;21H[30m[47m│                                                                                                    │[97m[40m [18;21H[30m[47m└────────────────────────────────────────────────────────────────────────────────────────────────────┘[97m[40m [19;22H                                                                                                      [16;89H
