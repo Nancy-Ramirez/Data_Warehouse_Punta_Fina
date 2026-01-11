@@ -1,0 +1,170 @@
+
+================================================================================
+🚀 ETL COMPLETO - PUNTAFINA DATA WAREHOUSE
+================================================================================
+
+📋 PASO 1: Limpiando tablas afectadas...
+--------------------------------------------------------------------------------
+   🗑️  Truncando dim_impuestos...
+      ✓ dim_impuestos limpiada
+   🗑️  Truncando dim_promocion...
+      ✓ dim_promocion limpiada
+   🗑️  Truncando fact_ventas...
+      ✓ fact_ventas limpiada
+   ✅ Limpieza completada exitosamente
+
+📋 PASO 2: Verificando estructura de tablas...
+--------------------------------------------------------------------------------
+   ➕ Agregando columna sk_promocion a fact_ventas...
+      ✓ Columna sk_promocion agregada
+   ✅ Estructura verificada
+
+📋 PASO 3: Ejecutando ETL principal...
+--------------------------------------------------------------------------------
+2026-01-09 00:08:48,872 - ETLOrchestrator - INFO - 🚀 Orquestador ETL inicializado
+2026-01-09 00:08:48,872 - ETLOrchestrator - INFO - ================================================================================
+2026-01-09 00:08:48,872 - ETLOrchestrator - INFO - 🏪 PUNTAFINA ETL BATCH - PROCESO COMPLETO
+2026-01-09 00:08:48,872 - ETLOrchestrator - INFO - ================================================================================
+2026-01-09 00:08:48,872 - ETLOrchestrator - INFO - 
+🔓 FASE -1: DESBLOQUEO FORZADO DE TABLAS
+2026-01-09 00:08:49,218 - ETLOrchestrator - INFO -    💥 Terminando conexiones idle...
+2026-01-09 00:08:49,309 - ETLOrchestrator - INFO -    ⏱️  Cancelando queries largas...
+2026-01-09 00:08:49,359 - ETLOrchestrator - INFO -    🔒 Liberando locks de tablas...
+2026-01-09 00:08:49,455 - ETLOrchestrator - INFO -    ✅ Desbloqueo forzado completado
+2026-01-09 00:08:49,455 - ETLOrchestrator - INFO - 
+📥 FASE 1: EXTRACCIÓN
+2026-01-09 00:08:49,455 - ETLOrchestrator - INFO -    📊 Verificando fuentes de datos disponibles...
+2026-01-09 00:08:49,455 - ETLOrchestrator - INFO -    ✓ orocommerce: oro_customer, oro_order, oro_product, oro_order_line_item
+2026-01-09 00:08:49,456 - ETLOrchestrator - INFO -    ✓ oro_crm: orocrm_channel
+2026-01-09 00:08:49,458 - ETLOrchestrator - INFO -    ✓ 24 archivos CSV en data/inputs/
+2026-01-09 00:08:49,458 - ETLOrchestrator - INFO - 
+   ✅ Fuentes verificadas: ~877,005 registros disponibles
+2026-01-09 00:08:49,458 - ETLOrchestrator - INFO - 
+🔄 FASE 2: TRANSFORMACIÓN - DIMENSIONES
+2026-01-09 00:08:49,458 - ETLOrchestrator - INFO -    🔨 Construyendo dimensiones con CompleteDimensionBuilder...
+2026-01-09 00:08:50,147 - ETLOrchestrator - ERROR -    ❌ Error construyendo dimensiones: DatabaseLoader.__init__() missing 1 required positional argument: 'config'
+2026-01-09 00:08:50,148 - ETLOrchestrator - INFO - 
+🔄 FASE 3: TRANSFORMACIÓN - TABLAS DE HECHOS
+2026-01-09 00:08:50,148 - ETLOrchestrator - INFO -    🏗️  Cargando facts directamente desde origen...
+2026-01-09 00:09:45,439 - ETLOrchestrator - INFO - ================================================================================
+CARGANDO TODOS LOS FACTS DESDE ORIGEN
+================================================================================
+
+Creando mapeos de dimensiones...
+  ✅ 4,018 fechas
+
+📦 FACT_INVENTARIO...
+   58,397 movimientos en CSV
+   58,397 registros válidos
+   ✅ 58,397 registros insertados
+
+💼 FACT_TRANSACCIONES...
+   2 transacciones en CSV (procesando sample de 50K)...
+   0 registros válidos
+   ✅ 0 registros insertados
+
+📊 FACT_BALANCE...
+   18 registros en CSV
+   18 registros válidos
+   ✅ 18 registros insertados
+
+📈 FACT_ESTADO_RESULTADOS...
+   15 registros en CSV
+   15 registros válidos
+   ✅ 15 registros insertados
+
+💰 FACT_VENTAS...
+   Llamando script especializado...
+   ⚠️  Error en carga: Traceback (most recent call last):
+  File "/Users/elsalvador/project/PuntaFina_DW_Oro/cargar_fact_ventas.py", line 190, in <module>
+    cargar_fact_ventas()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Users/elsalvador/project/PuntaFina_DW_Oro/cargar_fact_ventas.py", line 167, in cargar_fact_ventas
+    execute_values(cursor_dw, insert_query, registros, page_size=1000)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/lib/python3.13/site-packages/psycopg2/extras.py", line 1299, in execute_values
+    cur.execute(b''.join(parts))
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+psycopg2.errors.ForeignKeyViolation: insert or update on table "fact_ventas" violates foreign key constraint "fact_ventas_impuesto_id_fkey"
+DETAIL:  Key (impuesto_id)=(1) is not present in table "dim_impuestos".
+
+
+
+================================================================================
+✅ TODOS LOS FACTS CARGADOS CORRECTAMENTE
+================================================================================
+
+2026-01-09 00:09:45,871 - ETLOrchestrator - INFO -    🔄 fact_ventas vacío, recargando...
+2026-01-09 00:09:49,806 - ETLOrchestrator - INFO -       ✓ fact_ventas: 0 registros
+2026-01-09 00:09:49,859 - ETLOrchestrator - INFO -       ✓ fact_inventario: 58,397 registros
+2026-01-09 00:09:50,028 - ETLOrchestrator - INFO -       ✓ fact_transacciones: 577,640 registros
+2026-01-09 00:09:50,073 - ETLOrchestrator - INFO -       ✓ fact_balance: 18 registros
+2026-01-09 00:09:50,118 - ETLOrchestrator - INFO -       ✓ fact_estado_resultados: 15 registros
+2026-01-09 00:09:50,119 - ETLOrchestrator - INFO - 
+   ✅ Facts completadas: 636,070 registros totales
+2026-01-09 00:09:50,119 - ETLOrchestrator - INFO - 
+📤 FASE 4: CARGA
+2026-01-09 00:09:50,120 - ETLOrchestrator - INFO -    ℹ️  La carga se realizó directamente en las fases anteriores
+2026-01-09 00:09:50,120 - ETLOrchestrator - INFO -    ℹ️  Los datos ya están en la base de datos datawarehouse_bi
+2026-01-09 00:09:51,066 - ETLOrchestrator - WARNING -       ⚠️  dim_periodo: relation "dim_periodo" does not exist
+LINE 1: SELECT COUNT(*) FROM dim_periodo
+                             ^
+
+2026-01-09 00:09:51,479 - ETLOrchestrator - INFO - 
+   ✅ Verificación completada: 702,563 registros totales en DW
+2026-01-09 00:09:51,480 - ETLOrchestrator - INFO - 
+✅ FASE 5: VALIDACIÓN FINAL
+2026-01-09 00:09:51,480 - ETLOrchestrator - INFO -    🔍 Verificando integridad de datos...
+2026-01-09 00:09:51,931 - ETLOrchestrator - INFO -       ✓ dim_fecha: 4,018 registros
+2026-01-09 00:09:51,982 - ETLOrchestrator - INFO -       ✓ dim_cliente: 20,155 registros
+2026-01-09 00:09:52,026 - ETLOrchestrator - INFO -       ✓ dim_producto: 64 registros
+2026-01-09 00:09:52,081 - ETLOrchestrator - INFO -       ✓ dim_orden: 42,119 registros
+2026-01-09 00:09:52,127 - ETLOrchestrator - INFO -       ✓ dim_almacen: 6 registros
+2026-01-09 00:09:52,170 - ETLOrchestrator - INFO -       ✓ dim_proveedor: 8 registros
+2026-01-09 00:09:52,218 - ETLOrchestrator - INFO -       ✓ dim_tipo_movimiento: 9 registros
+2026-01-09 00:09:52,269 - ETLOrchestrator - INFO -       ✓ dim_centro_costo: 9 registros
+2026-01-09 00:09:52,315 - ETLOrchestrator - INFO -       ✓ dim_tipo_transaccion: 9 registros
+2026-01-09 00:09:52,357 - ETLOrchestrator - INFO -       ✗ dim_promocion: 0 registros
+2026-01-09 00:09:52,403 - ETLOrchestrator - INFO -       ⚠️ fact_ventas: 0 registros
+2026-01-09 00:09:52,459 - ETLOrchestrator - INFO -       ✓ fact_inventario: 58,397 registros
+2026-01-09 00:09:52,626 - ETLOrchestrator - INFO -       ✓ fact_transacciones: 577,640 registros
+2026-01-09 00:09:52,627 - ETLOrchestrator - INFO - 
+      ✓ Total en DW: 702,434 registros
+2026-01-09 00:09:52,627 - ETLOrchestrator - INFO -       ✓ Integridad verificada
+2026-01-09 00:09:52,628 - ETLOrchestrator - INFO - 
+================================================================================
+2026-01-09 00:09:52,628 - ETLOrchestrator - INFO - 📊 RESUMEN FINAL DEL PROCESO ETL
+2026-01-09 00:09:52,628 - ETLOrchestrator - INFO - ================================================================================
+2026-01-09 00:09:52,628 - ETLOrchestrator - INFO - 
+⏱️  Tiempo total: 63.75 segundos
+2026-01-09 00:09:52,628 - ETLOrchestrator - INFO - ✅ Estado: success
+2026-01-09 00:09:52,628 - ETLOrchestrator - INFO - 
+📥 Extracción:
+2026-01-09 00:09:52,628 - ETLOrchestrator - INFO -    Total registros: 877,005
+2026-01-09 00:09:52,629 - ETLOrchestrator - INFO - 
+🔄 Transformación:
+2026-01-09 00:09:52,629 - ETLOrchestrator - INFO -    Dimensiones: 0
+2026-01-09 00:09:52,629 - ETLOrchestrator - INFO -    Facts: 5
+2026-01-09 00:09:52,629 - ETLOrchestrator - INFO -    Total registros: 636,070
+2026-01-09 00:09:52,629 - ETLOrchestrator - INFO - 
+📤 Carga:
+2026-01-09 00:09:52,629 - ETLOrchestrator - INFO -    Tablas: 18
+2026-01-09 00:09:52,629 - ETLOrchestrator - INFO -    Total registros: 702,563
+2026-01-09 00:09:52,629 - ETLOrchestrator - WARNING - 
+⚠️  Errores encontrados:
+2026-01-09 00:09:52,629 - ETLOrchestrator - WARNING -    {'error': "DatabaseLoader.__init__() missing 1 required positional argument: 'config'"}
+2026-01-09 00:09:52,629 - ETLOrchestrator - INFO - 
+================================================================================
+
+
+📋 PASO 4: Verificación final de resultados...
+--------------------------------------------------------------------------------
+
+   📊 dim_impuestos: 0 registros
+      Códigos: None
+      ⚠️  ADVERTENCIA: Se esperaban 3 registros, se encontraron 0
+
+   ❌ Error en verificación: column "id_promocion_source" does not exist
+LINE 1: SELECT COUNT(*), MIN(id_promocion_source), MAX(id_promocion_...
+                             ^
+
