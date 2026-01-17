@@ -1,0 +1,81 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/*.log
+etl_*.log
+
+# Temporary files
+temp_*
+*_temp.py
+*.tmp
+*.bak
+*.backup
+*.csv.backup
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Output files
+db_structure.txt
+temp_tables.csv
+
+# OS specific
+Thumbs.db
+.DS_Store
+
+# Project specific
+data/outputs/csv/*.csv
+data/outputs/parquet/*.parquet
+
+# Keep structure but ignore content
+!data/outputs/csv/.gitkeep
+!data/outputs/parquet/.gitkeep
+!logs/etl/.gitkeep
+
+# Backup files
+*.backup
+*.old
+
+# Jupyter Notebooks checkpoints
+.ipynb_checkpoints/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# Testing
+.pytest_cache/
+.tox/
