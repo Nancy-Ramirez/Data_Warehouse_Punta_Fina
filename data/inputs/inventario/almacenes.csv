@@ -1,0 +1,7 @@
+id_almacen,nombre_almacen,tipo_almacen,ciudad,departamento,direccion,capacidad_m3,encargado,telefono,activo,fecha_apertura
+ALM_CENTRAL,Almacén Central,bodega,San Salvador,San Salvador,Zona Industrial Lote 45,500.00,María González,+503 2111-2222,TRUE,2023-01-10
+TIENDA_01,Tienda Metrocentro,tienda,San Salvador,San Salvador,Centro Comercial Metrocentro Local 234,80.00,Pedro Hernández,+503 2333-4444,TRUE,2023-01-15
+TIENDA_02,Tienda Multiplaza,tienda,San Salvador,San Salvador,Centro Comercial Multiplaza Local 156,75.00,Ana Martínez,+503 2555-6666,TRUE,2023-02-01
+TIENDA_03,Tienda Zona Rosa,tienda,San Salvador,San Salvador,Zona Rosa Blvd. del Hipódromo Local 45,60.00,Luis García,+503 2777-8888,TRUE,2023-03-15
+TIENDA_04,Tienda Santa Tecla,tienda,Santa Tecla,La Libertad,Centro Comercial Paseo Local 89,70.00,Carmen Flores,+503 2999-0000,TRUE,2023-04-20
+TIENDA_05,Tienda Santa Ana,tienda,Santa Ana,Santa Ana,Calle Libertad #456,65.00,Roberto Díaz,+503 2444-5555,TRUE,2023-05-10

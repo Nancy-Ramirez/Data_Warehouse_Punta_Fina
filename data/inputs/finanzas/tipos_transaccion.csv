@@ -1,0 +1,10 @@
+id_tipo_transaccion,nombre_tipo,categoria,descripcion
+TRX_VENTA,Registro de Venta,ingreso,Registro contable de venta realizada
+TRX_COSTO_VENTA,Registro de Costo de Venta,costo,Registro del costo de la mercadería vendida
+TRX_COMPRA,Registro de Compra,gasto,Registro de compra a proveedores
+TRX_PAGO_PROVEEDOR,Pago a Proveedor,egreso,Pago realizado a proveedor
+TRX_COBRO_CLIENTE,Cobro a Cliente,ingreso,Cobro efectuado a cliente
+TRX_GASTO,Registro de Gasto,gasto,Registro de gasto operativo
+TRX_PAGO_PLANILLA,Pago de Planilla,egreso,Pago de salarios y prestaciones
+TRX_DEPRECIACION,Depreciación,ajuste,Registro mensual de depreciación
+TRX_AJUSTE,Ajuste Contable,ajuste,Ajuste o corrección contable

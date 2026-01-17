@@ -1,0 +1,10 @@
+id_centro_costo,nombre_centro,tipo_centro,responsable,activo
+CC_TIENDA_01,Tienda Centro Comercial Metrocentro,ventas,Pedro Hernández,TRUE
+CC_TIENDA_02,Tienda Centro Comercial Multiplaza,ventas,Ana Martínez,TRUE
+CC_TIENDA_03,Tienda Zona Rosa,ventas,Luis García,TRUE
+CC_TIENDA_04,Tienda Santa Tecla,ventas,Carmen Flores,TRUE
+CC_TIENDA_05,Tienda Santa Ana,ventas,Roberto Díaz,TRUE
+CC_ECOMMERCE,Tienda en Línea,ventas,Patricia Morales,TRUE
+CC_ALMACEN,Almacén Central,operativo,María González,TRUE
+CC_ADMIN,Administración General,administrativo,Jorge Rivas,TRUE
+CC_MARKETING,Marketing y Publicidad,administrativo,Sofía Castillo,TRUE

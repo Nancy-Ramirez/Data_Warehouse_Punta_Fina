@@ -1,0 +1,9 @@
+id_envio,metodo_envio,tiempo_entrega,costo,estado,descripcion
+ENV001,Envío Estándar,5-7 días hábiles,5.99,activo,Envío regular a domicilio
+ENV002,Envío Express,2-3 días hábiles,12.99,activo,Envío rápido garantizado
+ENV003,Envío Premium,24-48 horas,24.99,activo,Entrega urgente mismo día o siguiente
+ENV004,Recogida en Tienda,Inmediato,0.00,activo,Cliente recoge en tienda física
+ENV005,Envío Gratis,7-10 días hábiles,0.00,activo,Promoción envío sin costo
+ENV006,Envío Internacional,15-20 días hábiles,35.00,activo,Envíos fuera del país
+ENV007,Envío Nocturno,12 horas,45.00,suspendido,Servicio temporal suspendido
+ENV008,Courier Especializado,1-2 días hábiles,18.50,activo,Para productos delicados

@@ -1,0 +1,43 @@
+id_cuenta,nombre_cuenta,tipo_cuenta,clasificacion,cuenta_padre,nivel,naturaleza,acepta_movimientos,estado_financiero,descripcion,activa
+1000,ACTIVO,activo,,,1,deudora,FALSE,balance,Grupo principal de activos,TRUE
+1100,Activo Corriente,activo,corriente,1000,2,deudora,FALSE,balance,Activos corrientes o circulantes,TRUE
+1101,Caja,activo,corriente,1100,3,deudora,TRUE,balance,Efectivo en caja general,TRUE
+1102,Bancos,activo,corriente,1100,3,deudora,TRUE,balance,Efectivo en cuentas bancarias,TRUE
+1103,Cuentas por Cobrar Clientes,activo,corriente,1100,3,deudora,TRUE,balance,Cuentas pendientes de cobro a clientes,TRUE
+1104,Inventario de Mercadería,activo,corriente,1100,3,deudora,TRUE,balance,Inventario de calzado disponible para venta,TRUE
+1200,Activo No Corriente,activo,no_corriente,1000,2,deudora,FALSE,balance,Activos de largo plazo,TRUE
+1201,Mobiliario y Equipo,activo,no_corriente,1200,3,deudora,TRUE,balance,Mobiliario y equipo de tiendas,TRUE
+1202,Equipo de Cómputo,activo,no_corriente,1200,3,deudora,TRUE,balance,Computadoras y equipos tecnológicos,TRUE
+1203,Edificios,activo,no_corriente,1200,3,deudora,TRUE,balance,Edificios propiedad de la empresa,TRUE
+1204,Depreciación Acumulada,activo,no_corriente,1200,3,acreedora,TRUE,balance,Depreciación acumulada de activos fijos,TRUE
+2000,PASIVO,pasivo,,,1,acreedora,FALSE,balance,Grupo principal de pasivos,TRUE
+2100,Pasivo Corriente,pasivo,corriente,2000,2,acreedora,FALSE,balance,Pasivos de corto plazo,TRUE
+2101,Cuentas por Pagar Proveedores,pasivo,corriente,2100,3,acreedora,TRUE,balance,Cuentas pendientes de pago a proveedores,TRUE
+2102,IVA por Pagar,pasivo,corriente,2100,3,acreedora,TRUE,balance,IVA pendiente de pago al fisco,TRUE
+2103,Retenciones por Pagar,pasivo,corriente,2100,3,acreedora,TRUE,balance,Retenciones pendientes de enterar,TRUE
+2200,Pasivo No Corriente,pasivo,no_corriente,2000,2,acreedora,FALSE,balance,Pasivos de largo plazo,TRUE
+2201,Préstamos Bancarios Largo Plazo,pasivo,no_corriente,2200,3,acreedora,TRUE,balance,Préstamos bancarios con vencimiento mayor a 1 año,TRUE
+3000,PATRIMONIO,patrimonio,,,1,acreedora,FALSE,balance,Grupo principal de patrimonio,TRUE
+3101,Capital Social,patrimonio,,3000,2,acreedora,TRUE,balance,Capital aportado por socios,TRUE
+3102,Utilidades Retenidas,patrimonio,,3000,2,acreedora,TRUE,balance,Utilidades acumuladas de ejercicios anteriores,TRUE
+3103,Utilidad del Ejercicio,patrimonio,,3000,2,acreedora,TRUE,balance,Utilidad o pérdida del período actual,TRUE
+4000,INGRESOS,ingreso,,,1,acreedora,FALSE,resultados,Grupo principal de ingresos,TRUE
+4101,Ventas,ingreso,,4000,2,acreedora,TRUE,resultados,Ingresos por ventas de calzado,TRUE
+4102,Devoluciones sobre Ventas,ingreso,,4000,2,deudora,TRUE,resultados,Devoluciones de mercadería vendida,TRUE
+4103,Descuentos sobre Ventas,ingreso,,4000,2,deudora,TRUE,resultados,Descuentos otorgados sobre ventas,TRUE
+5000,COSTO DE VENTAS,costo,,,1,deudora,FALSE,resultados,Grupo principal de costos,TRUE
+5101,Costo de Mercadería Vendida,costo,,5000,2,deudora,TRUE,resultados,Costo del calzado vendido,TRUE
+6000,GASTOS OPERATIVOS,gasto,,,1,deudora,FALSE,resultados,Grupo principal de gastos,TRUE
+6100,Gastos de Venta,gasto,,6000,2,deudora,FALSE,resultados,Gastos relacionados con ventas,TRUE
+6101,Sueldos Personal de Ventas,gasto,,6100,3,deudora,TRUE,resultados,Salarios del personal de tiendas,TRUE
+6102,Comisiones,gasto,,6100,3,deudora,TRUE,resultados,Comisiones por ventas,TRUE
+6103,Publicidad,gasto,,6100,3,deudora,TRUE,resultados,Gastos en publicidad y marketing,TRUE
+6104,Alquiler de Locales,gasto,,6100,3,deudora,TRUE,resultados,Alquiler de tiendas físicas,TRUE
+6200,Gastos de Administración,gasto,,6000,2,deudora,FALSE,resultados,Gastos administrativos,TRUE
+6201,Sueldos Personal Administrativo,gasto,,6200,3,deudora,TRUE,resultados,Salarios del personal administrativo,TRUE
+6202,Servicios Públicos,gasto,,6200,3,deudora,TRUE,resultados,Electricidad agua teléfono internet,TRUE
+6203,Papelería y Útiles,gasto,,6200,3,deudora,TRUE,resultados,Material de oficina,TRUE
+6204,Depreciación,gasto,,6200,3,deudora,TRUE,resultados,Depreciación de activos fijos,TRUE
+7000,GASTOS FINANCIEROS,gasto_financiero,,,1,deudora,FALSE,resultados,Grupo de gastos financieros,TRUE
+7101,Intereses Bancarios,gasto_financiero,,7000,2,deudora,TRUE,resultados,Intereses pagados por préstamos,TRUE
+7102,Comisiones Bancarias,gasto_financiero,,7000,2,deudora,TRUE,resultados,Comisiones bancarias pagadas,TRUE

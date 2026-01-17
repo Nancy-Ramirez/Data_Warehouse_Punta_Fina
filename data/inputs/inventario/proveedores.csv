@@ -1,0 +1,4 @@
+id_proveedor,nombre_proveedor,razon_social,nit,pais_origen,ciudad,direccion,telefono,email,contacto_principal,dias_credito,tipo_proveedor,categoria_productos,activo,fecha_registro
+PROV001,Calzado Premium SA,Calzado Premium Sociedad Anónima,0614-123456-001-2,El Salvador,San Salvador,Col. Escalón Calle Principal #123,+503 2222-3333,ventas@calzadopremium.com,Juan Pérez,30,nacional,"calzado_formal,calzado_deportivo",TRUE,2023-01-15
+PROV002,Importadora Zapatos Express,Importadora Zapatos Express SA de CV,0614-234567-002-3,Guatemala,Ciudad Guatemala,Zona 10 Ave. Las Américas 45-67,+502 2345-6789,compras@zapatosexpress.com,María López,45,internacional,"calzado_casual,sandalias",TRUE,2023-02-20
+PROV003,Distribuidora Calzado Fino,Distribuidora Calzado Fino SRL,0614-345678-003-4,El Salvador,Santa Ana,Barrio El Carmen Calle 5 #78,+503 2444-5555,info@calzadofino.com,Carlos Ramírez,15,nacional,"calzado_formal,zapatos_ejecutivos",TRUE,2023-03-10

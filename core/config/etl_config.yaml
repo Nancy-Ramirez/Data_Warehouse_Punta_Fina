@@ -1,0 +1,385 @@
+# ============================================================================
+# CONFIGURACIÓN ETL BATCH - PUNTAFINA DATA WAREHOUSE
+# ============================================================================
+# Sistema optimizado para procesamiento por lotes en Ubuntu 22.04
+# Mantiene coherencia entre OroCommerce, OroCRM y archivos CSV
+
+# ----------------------------------------------------------------------------
+# CONFIGURACIÓN DE BATCH PROCESSING
+# ----------------------------------------------------------------------------
+batch:
+  # Tamaño de lote para procesamiento (registros por batch)
+  chunk_size: 15000
+  
+  # Número máximo de trabajadores paralelos
+  max_workers: 8
+  
+  # Tiempo máximo de ejecución por lote (segundos)
+  timeout: 1800
+  
+  # Reintentos en caso de error
+  max_retries: 3
+  retry_delay: 5
+  
+  # Memoria máxima por worker (MB)
+  max_memory_mb: 800
+
+# ----------------------------------------------------------------------------
+# RUTAS DE DATOS
+# ----------------------------------------------------------------------------
+paths:
+  # Datos de entrada
+  input_csv: "../data/inputs"
+  input_sql_backups: ".."
+  
+  # Datos de salida
+  output_parquet: "../data/outputs/parquet"
+  output_csv: "../data/outputs/csv"
+  output_staging: "../data/staging"
+  
+  # Logs y auditoría
+  logs: "../logs/etl"
+  audit: "../logs/audit"
+  error: "../logs/errors"
+  
+  # Checkpoints para recuperación
+  checkpoints: "../data/checkpoints"
+
+# ----------------------------------------------------------------------------
+# CONFIGURACIÓN DE VALIDACIÓN Y POBLACIÓN DE DATOS
+# ----------------------------------------------------------------------------
+data_validation:
+  # Validar integridad referencial
+  check_referential_integrity: true
+  
+  # Poblar datos faltantes automáticamente
+  auto_populate_missing: true
+  
+  # Mantener simetría entre fuentes
+  enforce_symmetry: true
+  
+  # Validar tipos de datos
+  validate_data_types: true
+  
+  # Validar rangos de fechas
+  validate_date_ranges: true
+  min_date: "2020-01-01"
+  max_date: "2026-12-31"
+
+# ----------------------------------------------------------------------------
+# REGLAS DE POBLACIÓN AUTOMÁTICA
+# ----------------------------------------------------------------------------
+population_rules:
+  # Generar IDs automáticamente si faltan
+  auto_generate_ids: true
+  id_prefix: "AUTO_"
+  
+  # Valores por defecto para campos obligatorios
+  default_values:
+    estado: "activo"
+    tipo: "general"
+    moneda: "USD"
+    pais: "El Salvador"
+    idioma: "es_SV"
+    
+  # Fechas por defecto
+  default_dates:
+    created_at: "current_timestamp"
+    updated_at: "current_timestamp"
+
+# ----------------------------------------------------------------------------
+# CONFIGURACIÓN DE DIMENSIONES
+# ----------------------------------------------------------------------------
+dimensions:
+  # Dimensiones compartidas (conformadas)
+  conformed:
+    - dim_fecha
+    - dim_detalle_venta
+    - dim_usuario
+  
+  # Dimensiones del módulo de ventas
+  ventas:
+    - dim_cliente
+    - dim_producto
+    - dim_orden
+    - dim_impuestos
+    - dim_sitio_web
+    - dim_canal
+    - dim_direccion
+    - dim_envio
+    - dim_pago
+    - dim_estado_orden
+    - dim_estado_pago
+    - dim_promocion
+    - dim_line_item
+    - dim_categoria_producto
+    
+  # Dimensiones del módulo de inventario
+  inventario:
+    - dim_almacen
+    - dim_proveedor
+    - dim_tipo_movimiento
+    
+  # Dimensiones del módulo de finanzas
+  finanzas:
+    - dim_cuenta_contable
+    - dim_centro_costo
+    - dim_tipo_transaccion
+
+# ----------------------------------------------------------------------------
+# CONFIGURACIÓN DE TABLAS DE HECHOS
+# ----------------------------------------------------------------------------
+facts:
+  # Fact table de ventas
+  fact_ventas:
+    source_tables:
+      - oro_order
+      - oro_order_line_item
+      - oro_payment_transaction
+    grain: "Línea de pedido por transacción"
+    measures:
+      - cantidad
+      - precio_unitario
+      - subtotal
+      - descuento
+      - impuesto
+      - total
+    aggregations:
+      - sum
+      - avg
+      - count
+  
+  # Fact table de inventario
+  fact_inventario:
+    source_tables:
+      - movimientos_inventario
+    grain: "Movimiento de inventario individual"
+    measures:
+      - cantidad
+      - costo_unitario
+      - costo_total
+      - stock_antes
+      - stock_despues
+    aggregations:
+      - sum
+      - avg
+      - min
+      - max
+      
+  # Fact tables de finanzas
+  fact_transacciones:
+    source_tables:
+      - transacciones_contables
+    grain: "Transacción contable individual"
+    measures:
+      - monto_debe
+      - monto_haber
+      - saldo
+    aggregations:
+      - sum
+  
+  fact_balance:
+    grain: "Saldo mensual por cuenta"
+    measures:
+      - saldo_inicial
+      - debitos
+      - creditos
+      - saldo_final
+    aggregations:
+      - sum
+      
+  fact_estado_resultados:
+    grain: "Resultados mensuales"
+    measures:
+      - ingresos
+      - costos
+      - gastos
+      - utilidad_bruta
+      - utilidad_neta
+    aggregations:
+      - sum
+
+# ----------------------------------------------------------------------------
+# MAPEO DE FUENTES DE DATOS
+# ----------------------------------------------------------------------------
+data_sources:
+  # Base de datos OroCommerce
+  orocommerce:
+    enabled: true
+    priority: 1
+    tables:
+      - oro_order
+      - oro_order_line_item
+      - oro_customer
+      - oro_customer_user
+      - oro_product
+      - oro_address
+      - oro_payment_transaction
+      - oro_payment_status
+      - oro_inventory_level
+      - oro_promotion
+      - oro_promotion_applied_discount
+      - oro_shipping_product_opts
+      - oro_tax
+      - oro_user
+      - oro_website
+      - oro_price_list
+      - oro_price_product
+      - oro_product_unit
+  
+  # Base de datos OroCRM
+  orocrm:
+    enabled: true
+    priority: 2
+    tables:
+      - orocrm_channel
+  
+  # Archivos CSV
+  csv_files:
+    enabled: true
+    priority: 3
+    categories:
+      ventas:
+        - estados_orden.csv
+        - estados_pago.csv
+        - metodos_envio.csv
+      inventario:
+        - almacenes.csv
+        - movimientos_inventario.csv
+        - proveedores.csv
+        - tipos_movimiento.csv
+      finanzas:
+        - centros_costo.csv
+        - cuentas_contables.csv
+        - tipos_transaccion.csv
+        - transacciones_contables.csv
+
+# ----------------------------------------------------------------------------
+# CONFIGURACIÓN DE TRANSFORMACIONES
+# ----------------------------------------------------------------------------
+transformations:
+  # Limpieza de datos
+  cleaning:
+    remove_duplicates: true
+    trim_strings: true
+    normalize_text: true
+    handle_nulls: "default"  # default, remove, keep
+    
+  # Estandarización
+  standardization:
+    date_format: "YYYY-MM-DD"
+    datetime_format: "YYYY-MM-DD HH:mm:ss"
+    decimal_places: 2
+    currency_format: "0.00"
+    
+  # Enriquecimiento
+  enrichment:
+    calculate_derived_fields: true
+    add_audit_fields: true
+    add_hash_keys: true
+    
+# ----------------------------------------------------------------------------
+# CONFIGURACIÓN DE CARGA
+# ----------------------------------------------------------------------------
+loading:
+  # Estrategia de carga
+  strategy: "truncate_and_load"  # truncate_and_load, incremental, upsert
+  
+  # Tamaño de batch para inserts
+  insert_batch_size: 10000
+  
+  # Usar COPY en lugar de INSERT (más rápido)
+  use_copy: true
+  
+  # Crear índices después de cargar
+  create_indexes_after_load: true
+  
+  # Analizar tablas después de cargar
+  analyze_after_load: true
+  
+  # Vacuum después de cargar
+  vacuum_after_load: false
+
+# ----------------------------------------------------------------------------
+# CONFIGURACIÓN DE MONITOREO
+# ----------------------------------------------------------------------------
+monitoring:
+  # Nivel de logging
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  
+  # Formato de logs
+  log_format: "json"  # json, text
+  
+  # Métricas a recolectar
+  metrics:
+    - execution_time
+    - records_processed
+    - records_failed
+    - memory_usage
+    - cpu_usage
+    
+  # Alertas
+  alerts:
+    enabled: true
+    error_threshold: 10  # Porcentaje de errores permitidos
+    email_on_failure: false
+    slack_on_failure: false
+
+# ----------------------------------------------------------------------------
+# CONFIGURACIÓN DE RECUPERACIÓN
+# ----------------------------------------------------------------------------
+recovery:
+  # Habilitar checkpoints
+  enable_checkpoints: true
+  checkpoint_interval: 100  # Cada cuántos registros
+  
+  # Reanudar desde último checkpoint en caso de falla
+  resume_on_failure: true
+  
+  # Mantener backups
+  enable_backups: true
+  backup_retention_days: 7
+
+# ----------------------------------------------------------------------------
+# CONFIGURACIÓN DE OPTIMIZACIÓN
+# ----------------------------------------------------------------------------
+optimization:
+  # Usar procesamiento paralelo
+  parallel_processing: true
+  
+  # Comprimir archivos parquet
+  parquet_compression: "snappy"  # snappy, gzip, lz4
+  
+  # Particionar tablas grandes
+  enable_partitioning: false
+  partition_by: "fecha"
+  
+  # Cachear resultados intermedios
+  enable_caching: true
+  cache_ttl: 3600  # segundos
+
+# ----------------------------------------------------------------------------
+# CONFIGURACIÓN ESPECÍFICA PARA UBUNTU 22.04
+# ----------------------------------------------------------------------------
+ubuntu:
+  # Python version requerida
+  python_version: "3.10"
+  
+  # Paquetes del sistema necesarios
+  system_packages:
+    - postgresql-client
+    - python3-pip
+    - python3-venv
+    - libpq-dev
+    - build-essential
+    
+  # Variables de entorno
+  environment:
+    PYTHONUNBUFFERED: "1"
+    LANG: "en_US.UTF-8"
+    LC_ALL: "en_US.UTF-8"
+    
+  # Configuración de recursos
+  resources:
+    max_open_files: 65536
+    max_processes: 1024

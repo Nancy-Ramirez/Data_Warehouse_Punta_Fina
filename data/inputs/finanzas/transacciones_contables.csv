@@ -1,0 +1,13 @@
+numero_asiento,fecha_asiento,id_cuenta,id_centro_costo,id_tipo_transaccion,id_usuario,tipo_movimiento,monto,documento_referencia,descripcion,id_venta,id_movimiento_inventario,observaciones
+AST-2024-00001,2024-01-20,1102,CC_TIENDA_01,TRX_VENTA,2,debe,225.00,FACT-001,Registro de venta - Tienda Metrocentro,,,Venta de contado
+AST-2024-00001,2024-01-20,4101,CC_TIENDA_01,TRX_VENTA,2,haber,200.00,FACT-001,Registro de venta - Tienda Metrocentro,,,Subtotal venta
+AST-2024-00001,2024-01-20,2102,CC_TIENDA_01,TRX_VENTA,2,haber,25.00,FACT-001,IVA cobrado sobre venta,,,IVA 13%
+AST-2024-00002,2024-01-20,5101,CC_TIENDA_01,TRX_COSTO_VENTA,2,debe,177.50,FACT-001,Costo de venta - Tienda Metrocentro,,,Costo de 5 pares a $35.50
+AST-2024-00002,2024-01-20,1104,CC_TIENDA_01,TRX_COSTO_VENTA,2,haber,177.50,FACT-001,Salida de inventario,,,Reducción de inventario
+AST-2024-00003,2024-01-15,1104,CC_ALMACEN,TRX_COMPRA,1,debe,3550.00,COMP-2024-001,Compra de inventario,,,100 pares a $35.50
+AST-2024-00003,2024-01-15,2102,CC_ALMACEN,TRX_COMPRA,1,debe,461.50,COMP-2024-001,IVA crédito fiscal,,,IVA 13%
+AST-2024-00003,2024-01-15,2101,CC_ALMACEN,TRX_COMPRA,1,haber,4011.50,COMP-2024-001,Por pagar a proveedor PROV001,,,Crédito 30 días
+AST-2024-00004,2024-01-31,6101,CC_TIENDA_01,TRX_PAGO_PLANILLA,1,debe,800.00,PLAN-2024-01,Planilla enero - Personal ventas,,,Salario base
+AST-2024-00004,2024-01-31,2103,CC_TIENDA_01,TRX_PAGO_PLANILLA,1,haber,60.00,PLAN-2024-01,Retención ISSS,,,7.5%
+AST-2024-00004,2024-01-31,2103,CC_TIENDA_01,TRX_PAGO_PLANILLA,1,haber,40.00,PLAN-2024-01,Retención AFP,,,5%
+AST-2024-00004,2024-01-31,1102,CC_TIENDA_01,TRX_PAGO_PLANILLA,1,haber,700.00,PLAN-2024-01,Pago líquido,,,Transferencia bancaria

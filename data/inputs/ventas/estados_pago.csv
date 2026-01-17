@@ -1,0 +1,13 @@
+id_pago,metodo_pago,estado_pago,descripcion,requiere_validacion,plazo_dias
+PAG001,Tarjeta de Crédito,pending,Pago en proceso de validación,TRUE,0
+PAG002,Tarjeta de Débito,authorized,Autorizado pero no capturado,TRUE,0
+PAG003,Efectivo,paid_in_full,Pagado completamente en efectivo,FALSE,0
+PAG004,Transferencia Bancaria,pending,Esperando confirmación bancaria,TRUE,2
+PAG005,PayPal,paid_in_full,Pagado a través de PayPal,FALSE,0
+PAG006,Crédito Tienda,partially_paid,Pago parcial con crédito,FALSE,30
+PAG007,Tarjeta de Crédito,paid_in_full,Pago completado con tarjeta,FALSE,0
+PAG008,Contra Entrega,pending,Pago al recibir producto,FALSE,0
+PAG009,Cheque,pending,Cheque pendiente de cobro,TRUE,5
+PAG010,Tarjeta de Crédito,canceled,Transacción cancelada por cliente,FALSE,0
+PAG011,PayPal,failed,Pago rechazado por fondos insuficientes,FALSE,0
+PAG012,Transferencia Bancaria,paid_in_full,Transferencia confirmada,FALSE,0

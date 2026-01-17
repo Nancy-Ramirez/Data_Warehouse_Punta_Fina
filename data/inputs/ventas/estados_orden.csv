@@ -1,0 +1,17 @@
+id_estado_orden,codigo_estado,nombre_estado,descripcion,orden_flujo,es_estado_final,permite_modificacion
+EST001,open,Abierta,Orden creada pero no procesada,1,FALSE,TRUE
+EST002,pending_payment,Pago Pendiente,Esperando confirmación de pago,2,FALSE,TRUE
+EST003,payment_received,Pago Recibido,Pago confirmado y validado,3,FALSE,FALSE
+EST004,processing,En Procesamiento,Orden en preparación,4,FALSE,FALSE
+EST005,ready_to_ship,Lista para Envío,Empacada y lista,5,FALSE,FALSE
+EST006,shipped,Enviada,En tránsito al cliente,6,FALSE,FALSE
+EST007,in_transit,En Tránsito,En camino a destino,7,FALSE,FALSE
+EST008,out_for_delivery,En Reparto,En vehículo de entrega,8,FALSE,FALSE
+EST009,delivered,Entregada,Cliente recibió pedido,9,TRUE,FALSE
+EST010,completed,Completada,Transacción finalizada exitosamente,10,TRUE,FALSE
+EST011,canceled_by_customer,Cancelada por Cliente,Cliente canceló la orden,11,TRUE,FALSE
+EST012,canceled_by_store,Cancelada por Tienda,Tienda canceló por falta stock,12,TRUE,FALSE
+EST013,on_hold,En Espera,Orden pausada temporalmente,13,FALSE,TRUE
+EST014,failed,Fallida,Orden no pudo completarse,14,TRUE,FALSE
+EST015,returned,Devuelta,Cliente devolvió productos,15,TRUE,FALSE
+EST016,partially_shipped,Enviada Parcial,Solo algunos items enviados,16,FALSE,FALSE
