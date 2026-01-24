@@ -394,10 +394,11 @@ class ETLOrchestrator:
                                     "ALTER SEQUENCE dim_promocion_sk_promocion_seq RESTART WITH 1"
                                 )
                             else:
-                                cursor.execute(f"TRUNCATE TABLE {dim_name} CASCADE")
+                                # Usar DELETE en vez de TRUNCATE para evitar deadlocks
+                                cursor.execute(f"DELETE FROM {dim_name}")
                         except Exception as trunc_e:
                             self.logger.warning(
-                                f"         ⚠️  No se pudo truncar {dim_name}: {trunc_e}"
+                                f"         ⚠️  No se pudo limpiar {dim_name}: {trunc_e}"
                             )
 
                         # Insertar registros
@@ -406,9 +407,9 @@ class ETLOrchestrator:
 
                         # Para tablas con IDs explícitos usar OVERRIDING SYSTEM VALUE
                         if override_id:
-                            insert_query = f"INSERT INTO {dim_name} ({', '.join(columns)}) OVERRIDING SYSTEM VALUE VALUES %s"
+                            insert_query = f"INSERT INTO {dim_name} ({', '.join(columns)}) OVERRIDING SYSTEM VALUE VALUES %s ON CONFLICT DO NOTHING"
                         else:
-                            insert_query = f"INSERT INTO {dim_name} ({', '.join(columns)}) VALUES %s"
+                            insert_query = f"INSERT INTO {dim_name} ({', '.join(columns)}) VALUES %s ON CONFLICT DO NOTHING"
 
                         execute_values(cursor, insert_query, values, page_size=1000)
 
@@ -418,15 +419,12 @@ class ETLOrchestrator:
                         # Después de insertar dim_promocion, asegurar SK=1 para default
                         if dim_name == "dim_promocion":
                             try:
-                                # Resetear secuencia a 1
-                                cursor.execute(
-                                    "ALTER SEQUENCE dim_promocion_sk_promocion_seq RESTART WITH 1"
-                                )
-                                # Insertar SK=1 explícitamente
+                                # Insertar SK=1 si no existe (el builder ya lo incluye, pero por si acaso)
                                 cursor.execute(
                                     """
                                     INSERT INTO dim_promocion (sk_promocion, id_promocion_source, nombre_promocion, tipo_promocion, usa_cupones, activa, fecha_creacion, fecha_actualizacion, fecha_carga)
                                     VALUES (1, -1, 'Sin Promoción', 'Ninguno', false, true, '2020-01-01', '2020-01-01', NOW())
+                                    ON CONFLICT (sk_promocion) DO NOTHING
                                 """
                                 )
                                 # Actualizar secuencia para siguientes inserts
@@ -435,7 +433,7 @@ class ETLOrchestrator:
                                 )
                             except Exception as e:
                                 self.logger.warning(
-                                    f"         ⚠️  No se pudo asegurar SK=1: {e}"
+                                    f"         ⚠️  Error ajustando secuencia dim_promocion: {e}"
                                 )
 
                         records = len(df)

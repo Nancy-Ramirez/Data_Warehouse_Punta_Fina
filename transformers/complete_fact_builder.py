@@ -306,12 +306,15 @@ class CompleteFactBuilder:
             logger.warning("   ⚠️  No hay datos en oro_order/oro_order_line_item")
             return pd.DataFrame()
 
-        # Calcular subtotal después de descuento
-        df["subtotal"] = df["subtotal_bruto"] - df["descuento_total"]
+        iva_rate = 0.13
 
-        # Calcular impuesto e total sobre el subtotal con descuento
-        df["impuesto"] = df["subtotal"] * 0.13
-        df["total"] = df["subtotal"] + df["impuesto"] + df["envio"]
+        # Calcular subtotal después de descuento (ya incluye IVA en precios origen)
+        df["subtotal_incl_iva"] = df["subtotal_bruto"] - df["descuento_total"]
+
+        # Extraer IVA en vez de adicionarlo: precios ya vienen con IVA incluido
+        df["subtotal"] = (df["subtotal_incl_iva"] / (1 + iva_rate)).round(2)
+        df["impuesto"] = (df["subtotal_incl_iva"] - df["subtotal"]).round(2)
+        df["total"] = df["subtotal_incl_iva"] + df["envio"]
 
         # Cargar dimensiones en memoria desde la base de datos DW
         logger.info("   🔗 Cargando dimensiones desde DW...")
@@ -720,9 +723,14 @@ class CompleteFactBuilder:
             logger.warning("   ⚠️ No hay órdenes para generar transacciones")
             return pd.DataFrame()
 
-        # Calcular IVA (13% sobre subtotal)
-        df_ventas["iva"] = df_ventas["subtotal"] * 0.13
-        # Estimar costo (40% del subtotal - margen aproximado 60%)
+        iva_rate = 0.13
+
+        # Extraer IVA (precios ya incluyen IVA en OroCommerce)
+        df_ventas["subtotal_incl_iva"] = df_ventas["subtotal"]
+        df_ventas["subtotal"] = (df_ventas["subtotal_incl_iva"] / (1 + iva_rate)).round(2)
+        df_ventas["iva"] = (df_ventas["subtotal_incl_iva"] - df_ventas["subtotal"]).round(2)
+
+        # Estimar costo (40% del subtotal sin IVA - margen aproximado 60%)
         df_ventas["costo_venta"] = df_ventas["subtotal"] * 0.40
 
         # Convertir fecha a fecha_id

@@ -34,14 +34,27 @@ try:
 
     cur = conn.cursor()
 
-    # NO truncar dim_impuestos y dim_promocion - ya están correctamente pobladas
-    print("   ℹ️  Saltando limpieza de dim_impuestos y dim_promocion (ya pobladas)")
-
-    # Truncar fact_ventas
-    print("   🗑️  Truncando fact_ventas...")
-    cur.execute("TRUNCATE TABLE fact_ventas CASCADE")
+    # Limpiar dimensiones y facts en orden correcto para evitar violaciones de FK
+    print("   🗑️  Limpiando tablas...")
+    
+    # Primero: limpiar facts (dependientes)
+    print("      - fact_ventas...")
+    cur.execute("DELETE FROM fact_ventas")
+    print("      - fact_inventario...")
+    cur.execute("DELETE FROM fact_inventario")
+    print("      - fact_transacciones...")
+    cur.execute("DELETE FROM fact_transacciones")
+    print("      - fact_balance...")
+    cur.execute("DELETE FROM fact_balance")
+    print("      - fact_estado_resultados...")
+    cur.execute("DELETE FROM fact_estado_resultados")
+    
+    # Segundo: limpiar dimensiones (excepto las que no deben tocarse)
+    print("      - dim_cuenta_contable...")
+    cur.execute("DELETE FROM dim_cuenta_contable")
+    
     conn.commit()
-    print("      ✓ fact_ventas limpiada")
+    print("      ✓ Tablas limpiadas")
 
     cur.close()
     conn.close()
