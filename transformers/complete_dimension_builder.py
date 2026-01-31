@@ -198,18 +198,20 @@ class CompleteDimensionBuilder:
         """Construir dim_producto desde oro_product con precios y costos reales"""
         logger.info("📦 Construyendo dim_producto...")
 
-        # Extraer productos base (sin updated_at que no existe en esquema DW)
+        # Extraer productos base con categoría real de oro_catalog_category
         query = """
         SELECT 
-            id as producto_id,
-            id as producto_externo_id,
-            sku,
-            COALESCE(NULLIF(TRIM(name), ''), 'Producto ' || id) as nombre,
-            type as tipo,
-            created_at,
-            CASE WHEN status = 'enabled' THEN true ELSE false END as activo
-        FROM oro_product
-        ORDER BY id
+            p.id as producto_id,
+            p.id as producto_externo_id,
+            p.sku,
+            COALESCE(NULLIF(TRIM(p.name), ''), 'Producto ' || p.id) as nombre,
+            p.type as tipo,
+            p.created_at,
+            CASE WHEN p.status = 'enabled' THEN true ELSE false END as activo,
+            COALESCE(c.title, 'Sin Categoría') as categoria
+        FROM oro_product p
+        LEFT JOIN oro_catalog_category c ON p.category_id = c.id
+        ORDER BY p.id
         """
 
         df = pd.read_sql_query(query, self.oro_conn)
@@ -225,7 +227,7 @@ class CompleteDimensionBuilder:
         ].astype(str)
 
         df["descripcion"] = df["nombre"]
-        df["categoria"] = "Calzado"
+        # categoria ya viene del JOIN, no sobrescribir
         df["marca"] = df["nombre"].str.split().str[0].fillna("Sin Marca")
         df["unidad_medida"] = "Pieza"
 

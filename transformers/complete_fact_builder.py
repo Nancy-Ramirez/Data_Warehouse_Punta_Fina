@@ -312,6 +312,7 @@ class CompleteFactBuilder:
         df["subtotal_incl_iva"] = df["subtotal_bruto"] - df["descuento_total"]
 
         # Extraer IVA en vez de adicionarlo: precios ya vienen con IVA incluido
+        # Los datos de origen ya están en 2 decimales, redondear inmediatamente
         df["subtotal"] = (df["subtotal_incl_iva"] / (1 + iva_rate)).round(2)
         df["impuesto"] = (df["subtotal_incl_iva"] - df["subtotal"]).round(2)
         df["total"] = df["subtotal_incl_iva"] + df["envio"]
@@ -508,6 +509,20 @@ class CompleteFactBuilder:
         df_final["created_at"] = datetime.now()
 
         # =====================================================================
+        # REDONDEO FINAL: Redondear columnas monetarias a 2 decimales
+        # Solo al final para minimizar errores de redondeo acumulados
+        # =====================================================================
+        columnas_monetarias = [
+            'cantidad', 'precio_unitario', 'subtotal', 'descuento', 
+            'impuesto', 'envio', 'total', 'costo_unitario', 'costo_total', 'margen'
+        ]
+        for col in columnas_monetarias:
+            if col in df_final.columns:
+                df_final[col] = df_final[col].round(2)
+        
+        logger.info("   ✓ Valores monetarios redondeados a 2 decimales")
+
+        # =====================================================================
         # VALIDACIÓN FINAL: Verificar que no hay duplicados
         # =====================================================================
         duplicados_finales = df_final["line_item_id_externo"].duplicated().sum()
@@ -541,197 +556,167 @@ class CompleteFactBuilder:
         return df_final
 
     def build_fact_inventario(self) -> pd.DataFrame:
-        """Construir fact_inventario desde CSV movimientos_inventario"""
-        logger.info("📦 Construyendo fact_inventario...")
+        """
+        Construir fact_inventario desde CSV movimientos_inventario.csv
+        (Ya contiene entradas y salidas con signos correctos)
+        """
+        logger.info("📦 Construyendo fact_inventario desde CSV...")
 
-        csv_path = (
-            ROOT / "data" / "inputs" / "inventario" / "movimientos_inventario.csv"
-        )
+        csv_path = ROOT / "data" / "inputs" / "inventario" / "movimientos_inventario.csv"
         df = pd.read_csv(csv_path)
-        logger.info(f"   📥 Cargados {len(df):,} registros desde CSV")
+        logger.info(f"   📥 {len(df):,} movimientos cargados desde CSV")
 
-        # El CSV ya usa los códigos correctos directamente (ALM_CENTRAL, MOV_ENTRADA, PROV001)
-        # Solo renombramos columnas para alinear con el procesamiento
-        df["almacen_codigo"] = df["id_almacen"]
-        df["tipo_mov_codigo"] = df["id_tipo_movimiento"]
-        df["documento"] = df["numero_documento"]
-
-        # Convertir fecha a ID
-        df["fecha_id"] = (
-            pd.to_datetime(df["fecha_movimiento"]).dt.strftime("%Y%m%d").astype(int)
-        )
-
-        # Resolver SKs de dimensiones desde la base de datos
-        logger.info("   🔗 Resolviendo FKs desde DW...")
-
-        # Cargar dim_producto desde DB
+        # Convertir fecha a fecha_id
+        df["fecha_id"] = pd.to_datetime(df["fecha_movimiento"]).dt.strftime("%Y%m%d").astype(int)
+        
+        # Cargar dimensiones
         dim_producto = pd.read_sql_query(
             "SELECT producto_id, producto_externo_id FROM dim_producto", self.dw_conn
         )
-
-        # El CSV usa id_producto que corresponde a producto_externo_id
-        df["id_producto"] = df["id_producto"].astype(int)
-        dim_producto["producto_externo_id"] = dim_producto[
-            "producto_externo_id"
-        ].astype(int)
-
-        df = df.merge(
-            dim_producto,
-            left_on="id_producto",
-            right_on="producto_externo_id",
-            how="left",
-        )
-        df["producto_id"] = df["producto_id"].fillna(1).astype(int)
-        logger.info(f"   ✓ Productos resueltos: {(df['producto_id'] > 1).sum():,}")
-
-        # Cargar dim_almacen desde DB
         dim_almacen = pd.read_sql_query(
             "SELECT almacen_id, codigo FROM dim_almacen", self.dw_conn
         )
-
-        # Renombrar antes del merge para evitar conflictos
-        dim_almacen = dim_almacen.rename(
-            columns={"almacen_id": "almacen_id_dim", "codigo": "codigo_almacen"}
-        )
-        df = df.merge(
-            dim_almacen,
-            left_on="almacen_codigo",
-            right_on="codigo_almacen",
-            how="left",
-        )
-        df["almacen_id_final"] = df["almacen_id_dim"].fillna(1).astype(int)
-        logger.info(
-            f"   ✓ Almacenes resueltos: {df['almacen_id_final'].nunique()} únicos"
-        )
-
-        # Cargar dim_proveedor desde DB (el CSV ya usa códigos PROV001)
         dim_proveedor = pd.read_sql_query(
             "SELECT proveedor_id, codigo FROM dim_proveedor", self.dw_conn
         )
-
-        # Renombrar antes del merge
-        dim_proveedor = dim_proveedor.rename(
-            columns={"proveedor_id": "proveedor_id_dim", "codigo": "codigo_prov"}
-        )
-
-        # Rellenar proveedores vacíos con vacío para el merge
-        df["proveedor_codigo"] = df["id_proveedor"].fillna("")
-
-        df = df.merge(
-            dim_proveedor,
-            left_on="proveedor_codigo",
-            right_on="codigo_prov",
-            how="left",
-        )
-        # Si no hay proveedor, usar 1 como default
-        df["proveedor_id_final"] = df["proveedor_id_dim"].fillna(1).astype(int)
-        logger.info(
-            f"   ✓ Proveedores resueltos: {df['proveedor_id_final'].nunique()} únicos"
-        )
-
-        # Cargar dim_tipo_movimiento desde DB
         dim_tipo_mov = pd.read_sql_query(
             "SELECT tipo_movimiento_id, codigo FROM dim_tipo_movimiento", self.dw_conn
         )
-
-        # Renombrar antes del merge
-        dim_tipo_mov = dim_tipo_mov.rename(
-            columns={
-                "tipo_movimiento_id": "tipo_mov_id_dim",
-                "codigo": "codigo_tipo_mov",
-            }
-        )
-
-        df = df.merge(
-            dim_tipo_mov,
-            left_on="tipo_mov_codigo",
-            right_on="codigo_tipo_mov",
-            how="left",
-        )
-        df["tipo_movimiento_id_final"] = df["tipo_mov_id_dim"].fillna(1).astype(int)
-        logger.info(
-            f"   ✓ Tipos movimiento resueltos: {df['tipo_movimiento_id_final'].nunique()} únicos"
-        )
-
-        # Cargar dim_usuario para obtener ID válido
         dim_usuario = pd.read_sql_query(
             "SELECT MIN(usuario_id) as usuario_id FROM dim_usuario", self.dw_conn
         )
-        df["usuario_id"] = int(dim_usuario["usuario_id"].iloc[0])
-
-        # Columna created_at
-        df["created_at"] = pd.Timestamp.now()
-
-        # Limpiar observaciones NULL
-        df["observaciones"] = df["observaciones"].fillna("")
-
-        # Renombrar columnas para el resultado final
-        df["almacen_id"] = df["almacen_id_final"]
-        df["proveedor_id"] = df["proveedor_id_final"]
-        df["tipo_movimiento_id"] = df["tipo_movimiento_id_final"]
-
-        logger.info(f"   ✅ fact_inventario: {len(df):,} registros construidos")
-        logger.info(
-            f"   📊 Productos únicos: {df['producto_id'].nunique()}, Almacenes: {df['almacen_id'].nunique()}"
+        usuario_default = int(dim_usuario["usuario_id"].iloc[0])
+        
+        # Resolver producto_id
+        df["id_producto"] = df["id_producto"].astype(int)
+        dim_producto["producto_externo_id"] = dim_producto["producto_externo_id"].astype(int)
+        df = df.merge(
+            dim_producto.rename(columns={"producto_id": "producto_id_dim"}),
+            left_on="id_producto",
+            right_on="producto_externo_id",
+            how="left"
         )
-
-        # Seleccionar solo columnas del esquema (sin movimiento_id, es SERIAL)
-        return df[
-            [
-                "fecha_id",
-                "producto_id",
-                "almacen_id",
-                "tipo_movimiento_id",
-                "proveedor_id",
-                "usuario_id",
-                "cantidad",
-                "costo_unitario",
-                "costo_total",
-                "stock_anterior",
-                "stock_resultante",
-                "documento",
-                "observaciones",
-                "created_at",
-            ]
-        ]
+        df["producto_id"] = df["producto_id_dim"].fillna(1).astype(int)
+        
+        # Resolver almacen_id
+        df = df.merge(
+            dim_almacen.rename(columns={"almacen_id": "almacen_id_dim"}),
+            left_on="id_almacen",
+            right_on="codigo",
+            how="left"
+        )
+        df["almacen_id"] = df["almacen_id_dim"].fillna(1).astype(int)
+        
+        # Resolver proveedor_id (puede ser NULL)
+        df["proveedor_codigo"] = df["id_proveedor"].fillna("")
+        df = df.merge(
+            dim_proveedor.rename(columns={"proveedor_id": "proveedor_id_dim"}),
+            left_on="proveedor_codigo",
+            right_on="codigo",
+            how="left"
+        )
+        df["proveedor_id"] = df["proveedor_id_dim"]  # Dejar NULL donde no aplica
+        
+        # Resolver tipo_movimiento_id
+        df = df.merge(
+            dim_tipo_mov.rename(columns={"tipo_movimiento_id": "tipo_mov_id_dim"}),
+            left_on="id_tipo_movimiento",
+            right_on="codigo",
+            how="left"
+        )
+        df["tipo_movimiento_id"] = df["tipo_mov_id_dim"].fillna(1).astype(int)
+        
+        # Usuario y documento
+        df["usuario_id"] = usuario_default
+        df["documento"] = df["numero_documento"]
+        df["observaciones"] = df["observaciones"].fillna("")
+        df["created_at"] = pd.Timestamp.now()
+        
+        # Seleccionar columnas finales (sin movimiento_id, es SERIAL)
+        result = df[[
+            "fecha_id", "producto_id", "almacen_id", "tipo_movimiento_id",
+            "proveedor_id", "usuario_id", "cantidad", "costo_unitario",
+            "costo_total", "stock_anterior", "stock_resultante",
+            "documento", "observaciones", "created_at"
+        ]]
+        
+        logger.info(f"   ✅ fact_inventario: {len(result):,} registros construidos")
+        logger.info(f"   📊 Productos únicos: {result['producto_id'].nunique()}, Almacenes: {result['almacen_id'].nunique()}")
+        
+        return result
 
     def build_fact_transacciones(self) -> pd.DataFrame:
         """
         Construir fact_transacciones generando asientos contables desde ventas.
-        Cada venta genera asientos de: Ingreso, IVA, Costo de Ventas.
+        Cada venta genera 5 asientos: Bancos, Ventas, IVA, Costo de Ventas, Inventario.
+        
+        Lee desde OroCommerce, calcula IVA por línea, luego suma por orden.
         """
-        logger.info("💳 Construyendo fact_transacciones desde ventas...")
+        logger.info("💳 Construyendo fact_transacciones desde OroCommerce...")
 
-        # Obtener ventas resumidas por orden desde OroCommerce
+        # Leer líneas individuales de órdenes desde OroCommerce
         query = """
         SELECT 
             o.id as orden_id,
             o.created_at::date as fecha,
-            o.subtotal_value as subtotal,
-            o.total_discounts_amount as descuento,
-            o.total_value as total,
-            o.user_owner_id as usuario_id
+            o.user_owner_id as usuario_id,
+            oli.id as line_item_id,
+            CAST(oli.quantity * oli.value AS NUMERIC(10,2)) as subtotal_bruto
         FROM oro_order o
+        INNER JOIN oro_order_line_item oli ON o.id = oli.order_id
         WHERE o.created_at IS NOT NULL
-        ORDER BY o.created_at
+          AND oli.product_id IS NOT NULL
+          AND oli.quantity > 0
+        ORDER BY o.id
         """
 
-        df_ventas = pd.read_sql_query(query, self.oro_conn)
-        logger.info(f"   📥 Órdenes cargadas: {len(df_ventas):,}")
+        df_lineas = pd.read_sql_query(query, self.oro_conn)
+        logger.info(f"   📥 Líneas cargadas desde OroCommerce: {len(df_lineas):,}")
 
-        if df_ventas.empty:
-            logger.warning("   ⚠️ No hay órdenes para generar transacciones")
+        if df_lineas.empty:
+            logger.warning("   ⚠️ No hay líneas para generar transacciones")
             return pd.DataFrame()
 
+        # Obtener descuentos por line item
+        query_descuentos = """
+        SELECT 
+            d.line_item_id,
+            CAST(SUM(COALESCE(d.amount, 0.0)) AS NUMERIC(10,2)) as descuento_total
+        FROM oro_promotion_applied_discount d
+        WHERE d.line_item_id IS NOT NULL
+        GROUP BY d.line_item_id
+        """
+        
+        try:
+            df_descuentos = pd.read_sql_query(query_descuentos, self.oro_conn)
+            logger.info(f"   📥 Descuentos: {len(df_descuentos):,} line items con descuento")
+            df_lineas = df_lineas.merge(df_descuentos, on="line_item_id", how="left")
+            df_lineas["descuento_total"] = df_lineas["descuento_total"].fillna(0.0)
+        except Exception as e:
+            logger.warning(f"   ⚠️ No se pudieron obtener descuentos: {e}")
+            df_lineas["descuento_total"] = 0.0
+
+        # Calcular IVA POR LÍNEA usando la misma fórmula que fact_ventas
         iva_rate = 0.13
+        df_lineas["subtotal_incl_iva"] = df_lineas["subtotal_bruto"] - df_lineas["descuento_total"]
+        df_lineas["subtotal"] = (df_lineas["subtotal_incl_iva"] / (1 + iva_rate)).round(2)
+        df_lineas["iva"] = (df_lineas["subtotal_incl_iva"] - df_lineas["subtotal"]).round(2)
+        df_lineas["total"] = df_lineas["subtotal_incl_iva"]
+        
+        # Convertir usuario_id a Int64 (nullable)
+        df_lineas["usuario_id"] = df_lineas["usuario_id"].astype('Int64')
 
-        # Extraer IVA (precios ya incluyen IVA en OroCommerce)
-        df_ventas["subtotal_incl_iva"] = df_ventas["subtotal"]
-        df_ventas["subtotal"] = (df_ventas["subtotal_incl_iva"] / (1 + iva_rate)).round(2)
-        df_ventas["iva"] = (df_ventas["subtotal_incl_iva"] - df_ventas["subtotal"]).round(2)
+        # AHORA agrupar por orden (sumando valores YA redondeados por línea)
+        df_ventas = df_lineas.groupby(['orden_id', 'fecha', 'usuario_id'], dropna=False).agg({
+            'total': 'sum',
+            'subtotal': 'sum',
+            'iva': 'sum'
+        }).reset_index()
+        
+        logger.info(f"   📊 Órdenes agrupadas: {len(df_ventas):,}")
 
-        # Estimar costo (40% del subtotal sin IVA - margen aproximado 60%)
-        df_ventas["costo_venta"] = df_ventas["subtotal"] * 0.40
+        # Estimar costo (40% del subtotal - margen aproximado 60%)
+        df_ventas["costo_venta"] = (df_ventas["subtotal"] * 0.40).round(2)
 
         # Convertir fecha a fecha_id
         df_ventas["fecha_id"] = (
@@ -748,12 +733,12 @@ class CompleteFactBuilder:
         for _, row in dim_cuenta.iterrows():
             cuenta_map[row["codigo"]] = row["cuenta_id"]
 
-        # Cuentas típicas para asientos de ventas:
-        # 4101 = Ventas, 1102 = Bancos, 2102 = IVA por Pagar, 5101 = Costo de Ventas
-        cuenta_ventas = cuenta_map.get("4101", 1)
-        cuenta_bancos = cuenta_map.get("1102", 1)
-        cuenta_iva = cuenta_map.get("2102", 1)
-        cuenta_costo = cuenta_map.get("5101", 1)
+        # Cuentas para asientos de ventas:
+        cuenta_ventas = cuenta_map.get("4101", 1)      # Ventas (Ingreso)
+        cuenta_bancos = cuenta_map.get("1102", 1)      # Bancos (Activo)
+        cuenta_iva = cuenta_map.get("2102", 1)         # IVA por Pagar (Pasivo)
+        cuenta_costo = cuenta_map.get("5101", 1)       # Costo de Ventas (Gasto)
+        cuenta_inventario = cuenta_map.get("1103", 1)  # Inventario (Activo)
 
         # Cargar tipo_transaccion desde DW
         dim_tipo = pd.read_sql_query(
@@ -848,6 +833,44 @@ class CompleteFactBuilder:
                     }
                 )
 
+            # Asiento 4: Débito a Costo de Ventas (reconocer el costo)
+            if venta["costo_venta"] > 0:
+                transacciones.append(
+                    {
+                        "fecha_id": fecha_id,
+                        "cuenta_id": cuenta_costo,
+                        "centro_costo_id": centro_costo_id,
+                        "tipo_transaccion_id": tipo_venta_id,
+                        "usuario_id": usuario_id,
+                        "numero_asiento": f"AST-{asiento_num:06d}",
+                        "tipo_movimiento": "DEBITO",
+                        "monto": float(venta["costo_venta"]),
+                        "documento_referencia": f"ORD-{orden_id}",
+                        "descripcion": f"Costo de venta orden #{orden_id}",
+                        "orden_id": orden_id,
+                        "movimiento_inventario_id": None,
+                    }
+                )
+
+            # Asiento 5: Crédito a Inventario (salida de inventario)
+            if venta["costo_venta"] > 0:
+                transacciones.append(
+                    {
+                        "fecha_id": fecha_id,
+                        "cuenta_id": cuenta_inventario,
+                        "centro_costo_id": centro_costo_id,
+                        "tipo_transaccion_id": tipo_venta_id,
+                        "usuario_id": usuario_id,
+                        "numero_asiento": f"AST-{asiento_num:06d}",
+                        "tipo_movimiento": "CREDITO",
+                        "monto": float(venta["costo_venta"]),
+                        "documento_referencia": f"ORD-{orden_id}",
+                        "descripcion": f"Salida inventario orden #{orden_id}",
+                        "orden_id": orden_id,
+                        "movimiento_inventario_id": None,
+                    }
+                )
+
             asiento_num += 1
 
         df = pd.DataFrame(transacciones)
@@ -883,116 +906,86 @@ class CompleteFactBuilder:
         ]
 
     def build_fact_balance(self) -> pd.DataFrame:
-        """Construir fact_balance desde CSV o fact_transacciones"""
-        logger.info("📊 Construyendo fact_balance...")
+        """
+        Construir fact_balance desde fact_transacciones.
+        Agrega movimientos contables por período y cuenta para generar Balance General.
+        
+        La cadena de datos es: OroCommerce → fact_transacciones → fact_balance
+        """
+        logger.info("📊 Construyendo fact_balance desde fact_transacciones...")
 
-        # Primero intentar cargar desde CSV
-        csv_path = ROOT / "data" / "inputs" / "balance.csv"
-        if csv_path.exists():
-            logger.info(f"   📂 Cargando desde CSV: {csv_path}")
-            try:
-                df = pd.read_csv(csv_path)
-
-                # Eliminar fecha_id del CSV si existe (lo recalcularemos)
-                if "fecha_id" in df.columns:
-                    df = df.drop(columns=["fecha_id"])
-
-                # Los cuenta_id del CSV ya son surrogate keys (1,2,3...)
-                # Solo necesitamos validar que existan en dim_cuenta_contable
-                parquet_dir = ROOT / "data" / "outputs" / "parquet"
-                dim_cuenta = pd.read_parquet(
-                    parquet_dir / "dim_cuenta_contable.parquet"
-                )
-                cuentas_validas = dim_cuenta["cuenta_contable_id"].unique()
-
-                # Filtrar solo cuentas que existen
-                df_original_count = len(df)
-                df = df[df["cuenta_id"].isin(cuentas_validas)]
-                if df_original_count > len(df):
-                    logger.warning(
-                        f"   ⚠️  Filtrados {df_original_count - len(df)} registros con cuentas inexistentes"
-                    )
-
-                # Convertir tipos
-                for col in ["periodo_id", "cuenta_id"]:
-                    df[col] = df[col].astype(int)
-                for col in ["saldo_inicial", "debitos", "creditos", "saldo_final"]:
-                    df[col] = df[col].astype(float).round(2)
-
-                # Si periodo_id es secuencial (1,2,3...) convertir a formato YYYYMM
-                if df["periodo_id"].min() < 1000:
-                    logger.info(
-                        f"   🔄 Convirtiendo periodo_id secuencial a formato YYYYMM..."
-                    )
-                    df["periodo_id"] = 202400 + df["periodo_id"]
-
-                # Generar fecha_id desde periodo_id (YYYYMM → YYYYMM01)
-                df["fecha_id"] = (df["periodo_id"] * 100 + 1).astype(int)
-                
-                # Agregar created_at timestamp
-                df["created_at"] = pd.Timestamp.now()
-
-                # NO agregar balance_id - es SERIAL en la tabla y se genera automáticamente
-
-                logger.info(f"   ✓ fact_balance: {len(df):,} registros desde CSV")
-                logger.info(f"   Períodos: {sorted(df['periodo_id'].unique())}")
-                return df
-            except Exception as e:
-                logger.warning(f"   ⚠️  Error leyendo CSV: {e}")
-
-        # Si no hay CSV, intentar construir desde fact_transacciones
-        logger.info("   📊 Construyendo desde fact_transacciones...")
+        # Leer transacciones del DW y agrupar por período/cuenta
         query = """
         SELECT 
-            periodo_id,
+            fecha_id / 100 as periodo_id,
             cuenta_id,
+            centro_costo_id,
             SUM(CASE WHEN tipo_movimiento = 'DEBITO' THEN monto ELSE 0 END) as debitos,
             SUM(CASE WHEN tipo_movimiento = 'CREDITO' THEN monto ELSE 0 END) as creditos
         FROM fact_transacciones
-        WHERE cuenta_id IS NOT NULL AND periodo_id IS NOT NULL
-        GROUP BY periodo_id, cuenta_id
-        ORDER BY periodo_id, cuenta_id
+        WHERE fecha_id IS NOT NULL
+        GROUP BY fecha_id / 100, cuenta_id, centro_costo_id
+        ORDER BY cuenta_id, periodo_id
         """
 
         try:
             df = pd.read_sql_query(query, self.dw_conn)
-
-            # Calcular saldos
-            # Saldo inicial = saldo final del período anterior
-            # Ordenar por cuenta y período
-            df = df.sort_values(["cuenta_id", "periodo_id"])
-
-            # Para cada cuenta, calcular el saldo acumulado
-            df["saldo_inicial"] = 0.0
-            df["saldo_final"] = df["debitos"] - df["creditos"]
-
-            # Calcular saldo inicial como el saldo final del período anterior
-            for cuenta_id in df["cuenta_id"].unique():
-                mask = df["cuenta_id"] == cuenta_id
-                # Acumular saldo para esta cuenta
-                saldos = df.loc[mask, "saldo_final"].cumsum()
-                # El saldo inicial es el saldo acumulado del período anterior
-                df.loc[mask, "saldo_final"] = saldos
-                df.loc[mask, "saldo_inicial"] = saldos.shift(1).fillna(0)
-
-            # Convertir tipos numpy a tipos nativos de Python
-            for col in ["periodo_id", "cuenta_id"]:
-                df[col] = df[col].astype(int)
-            for col in ["debitos", "creditos", "saldo_inicial", "saldo_final"]:
-                df[col] = df[col].astype(float).round(2)
-
-            # Generar fecha_id desde periodo_id (YYYYMM → YYYYMM01)
-            df["fecha_id"] = (df["periodo_id"] * 100 + 1).astype(int)
             
-            # Agregar created_at timestamp
+            if df.empty:
+                logger.warning("   ⚠️ No hay datos en fact_transacciones")
+                return pd.DataFrame()
+
+            logger.info(f"   📥 Registros agregados: {len(df):,} (cuenta/período)")
+
+            # Calcular saldos acumulativos por cuenta
+            df = df.sort_values(["cuenta_id", "periodo_id"])
+            
+            # Movimiento neto del período
+            df["movimiento_neto"] = df["debitos"] - df["creditos"]
+            
+            # Saldo acumulativo por cuenta
+            df["saldo_final"] = df.groupby("cuenta_id")["movimiento_neto"].cumsum()
+            df["saldo_inicial"] = df.groupby("cuenta_id")["saldo_final"].shift(1).fillna(0)
+            
+            # Redondear
+            for col in ["debitos", "creditos", "saldo_inicial", "saldo_final"]:
+                df[col] = df[col].round(2)
+
+            # Convertir tipos
+            df["periodo_id"] = df["periodo_id"].astype(int)
+            df["cuenta_id"] = df["cuenta_id"].astype(int)
+            df["centro_costo_id"] = df["centro_costo_id"].fillna(19).astype(int)
+            
+            # Generar fecha_id (YYYYMM → YYYYMM01)
+            df["fecha_id"] = (df["periodo_id"] * 100 + 1).astype(int)
             df["created_at"] = pd.Timestamp.now()
+            
+            # Eliminar columna temporal
+            df = df.drop(columns=["movimiento_neto"])
 
-            # NO agregar balance_id - es SERIAL en la tabla y se genera automáticamente
+            result = df[["periodo_id", "cuenta_id", "centro_costo_id", "saldo_inicial", 
+                        "debitos", "creditos", "saldo_final", "fecha_id", "created_at"]]
 
-            logger.info(f"✓ fact_balance: {len(df):,} registros agregados")
-            logger.info(
-                f"   Períodos: {df['periodo_id'].nunique()}, Cuentas: {df['cuenta_id'].nunique()}"
-            )
+            logger.info(f"   ✓ fact_balance: {len(result):,} registros construidos")
+            logger.info(f"   Períodos: {result['periodo_id'].nunique()}, Cuentas: {result['cuenta_id'].nunique()}")
+            
+            # Verificar balance
+            total_debitos = result["debitos"].sum()
+            total_creditos = result["creditos"].sum()
+            diferencia = total_debitos - total_creditos
+            
+            if abs(diferencia) < 0.01:
+                logger.info(f"   ✅ Balance verificado: Débitos=${total_debitos:,.2f} = Créditos=${total_creditos:,.2f}")
+            else:
+                logger.warning(f"   ⚠️ Desbalance: ${diferencia:,.2f}")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"   ❌ Error construyendo fact_balance: {e}")
+            import traceback
+            traceback.print_exc()
+            return pd.DataFrame()
 
         except Exception as e:
             logger.error(f"❌ Error construyendo fact_balance: {e}")
@@ -1003,14 +996,17 @@ class CompleteFactBuilder:
                 columns=[
                     "periodo_id",
                     "cuenta_id",
+                    "centro_costo_id",
                     "saldo_inicial",
                     "debitos",
                     "creditos",
                     "saldo_final",
+                    "fecha_id",
+                    "created_at"
                 ]
             )
 
-        return df
+        return df[["periodo_id", "cuenta_id", "centro_costo_id", "saldo_inicial", "debitos", "creditos", "saldo_final", "fecha_id", "created_at"]]
 
     def build_fact_estado_resultados(self) -> pd.DataFrame:
         """Construir fact_estado_resultados desde CSV o fact_transacciones"""
@@ -1081,7 +1077,7 @@ class CompleteFactBuilder:
         logger.info("   📈 Construyendo desde fact_transacciones...")
         query = """
         SELECT 
-            ft.periodo_id,
+            fecha_id / 100 as periodo_id,
             ft.cuenta_id,
             ft.centro_costo_id,
             dc.tipo as naturaleza_cuenta,
@@ -1093,66 +1089,99 @@ class CompleteFactBuilder:
         FROM fact_transacciones ft
         INNER JOIN dim_cuenta_contable dc ON ft.cuenta_id = dc.cuenta_id
         WHERE ft.cuenta_id IS NOT NULL 
-          AND ft.periodo_id IS NOT NULL
+          AND ft.fecha_id IS NOT NULL
           AND dc.codigo IS NOT NULL
-        GROUP BY ft.periodo_id, ft.cuenta_id, ft.centro_costo_id, dc.tipo, dc.nombre
-        ORDER BY ft.periodo_id, ft.cuenta_id
+        GROUP BY fecha_id / 100, ft.cuenta_id, ft.centro_costo_id, dc.tipo, dc.nombre
+        ORDER BY periodo_id, ft.cuenta_id
         """
 
         try:
             df = pd.read_sql_query(query, self.dw_conn)
 
-            # Clasificar cuentas por tipo de estado de resultados
-            # Las cuentas 4000-4999 son ingresos, 5000-5999 son costos, 6000-6999 son gastos
-            def clasificar_cuenta(row):
-                # Aquí clasificamos por nombre o naturaleza
-                nombre = str(row["nombre_cuenta"]).lower()
-                if "ingreso" in nombre or "venta" in nombre:
-                    return "ingreso"
-                elif "costo" in nombre or "compra" in nombre:
-                    return "costo"
-                elif "gasto" in nombre:
-                    return "gasto"
+            # Agregar código de cuenta para clasificación
+            query_codigos = """
+            SELECT cuenta_id, codigo 
+            FROM dim_cuenta_contable
+            """
+            df_codigos = pd.read_sql_query(query_codigos, self.dw_conn)
+            df = df.merge(df_codigos, on='cuenta_id', how='left')
+
+            # Clasificar cuentas por código contable
+            # 4101 = Ventas (ingresos - CRÉDITO)
+            # 5101 = Costo de Ventas (costos - DÉBITO) 
+            # 6xxx = Gastos operativos (gastos - DÉBITO)
+            def clasificar_y_calcular_monto(row):
+                codigo = str(row['codigo'])
+                
+                # Ingresos: cuenta 4xxx - usar CRÉDITOS
+                if codigo.startswith('4'):
+                    return 'ingreso', row['creditos']
+                # Costos: cuenta 5xxx - usar DÉBITOS
+                elif codigo.startswith('5'):
+                    return 'costo', row['debitos']
+                # Gastos: cuenta 6xxx - usar DÉBITOS  
+                elif codigo.startswith('6'):
+                    return 'gasto', row['debitos']
                 else:
-                    return "otro"
+                    return 'otro', 0
+            
+            df[['tipo_cuenta', 'monto_clasificado']] = df.apply(
+                clasificar_y_calcular_monto, axis=1, result_type='expand'
+            )
 
-            df["tipo_cuenta"] = df.apply(clasificar_cuenta, axis=1)
+            # Agrupar SOLO por período y centro de costo (CONSOLIDANDO todas las cuentas)
+            agrupado = df.groupby(['periodo_id', 'centro_costo_id', 'tipo_cuenta']).agg({
+                'monto_clasificado': 'sum'
+            }).reset_index()
 
-            # Pivotar para calcular componentes del estado de resultados
-            pivot = df.pivot_table(
-                index=["periodo_id", "cuenta_id", "centro_costo_id"],
-                columns="tipo_cuenta",
-                values="creditos",  # Ingresos y costos usan créditos generalmente
-                aggfunc="sum",
-                fill_value=0,
+            # Pivotar para tener ingresos, costos y gastos como columnas
+            pivot = agrupado.pivot_table(
+                index=['periodo_id', 'centro_costo_id'],
+                columns='tipo_cuenta',
+                values='monto_clasificado',
+                aggfunc='sum',
+                fill_value=0
             ).reset_index()
 
             # Calcular métricas financieras
-            pivot["ingresos"] = pivot.get("ingreso", 0)
-            pivot["costos"] = pivot.get("costo", 0)
-            pivot["gastos"] = pivot.get("gasto", 0)
-            pivot["utilidad_bruta"] = pivot["ingresos"] - pivot["costos"]
-            pivot["utilidad_neta"] = pivot["utilidad_bruta"] - pivot["gastos"]
+            pivot['ingresos'] = pivot.get('ingreso', 0)
+            pivot['costos'] = pivot.get('costo', 0)
+            pivot['gastos'] = pivot.get('gasto', 0)
+            pivot['utilidad_bruta'] = pivot['ingresos'] - pivot['costos']
+            pivot['utilidad_neta'] = pivot['utilidad_bruta'] - pivot['gastos']
+
+            # Obtener el cuenta_id de cualquier cuenta de ingresos (4101 - Ventas)
+            # Ya que consolidamos, usamos la cuenta de ingresos como referencia
+            query_cuenta_ref = """
+            SELECT cuenta_id FROM dim_cuenta_contable 
+            WHERE codigo = '4101' LIMIT 1
+            """
+            cuenta_ref_df = pd.read_sql_query(query_cuenta_ref, self.dw_conn)
+            if len(cuenta_ref_df) > 0:
+                cuenta_id_ref = int(cuenta_ref_df['cuenta_id'].iloc[0])
+            else:
+                # Fallback: usar la primera cuenta disponible
+                cuenta_id_ref = 1850
+            
+            pivot['cuenta_id'] = cuenta_id_ref  # Usar cuenta de Ventas como referencia
 
             # Seleccionar solo las columnas finales
-            result = pivot[
-                [
-                    "periodo_id",
-                    "cuenta_id",
-                    "centro_costo_id",
-                    "ingresos",
-                    "costos",
-                    "gastos",
-                    "utilidad_bruta",
-                    "utilidad_neta",
-                ]
-            ]
+            result = pivot[[
+                'periodo_id',
+                'cuenta_id', 
+                'centro_costo_id',
+                'ingresos',
+                'costos',
+                'gastos',
+                'utilidad_bruta',
+                'utilidad_neta'
+            ]]
 
             # Filtrar filas con al menos un valor no cero
             result = result[
-                (result["ingresos"] != 0)
-                | (result["costos"] != 0)
-                | (result["gastos"] != 0)
+                (result['ingresos'] != 0) |
+                (result['costos'] != 0) |
+                (result['gastos'] != 0)
             ]
 
             # Convertir tipos numpy a tipos nativos de Python

@@ -7,25 +7,24 @@
 1. [fact_ventas](#1-fact_ventas)
 2. [fact_inventario](#2-fact_inventario)
 3. [fact_transacciones](#3-fact_transacciones)
-4. [fact_promocion_aplicada](#4-fact_promocion_aplicada)
-5. [fact_balance](#5-fact_balance)
-6. [fact_estado_resultados](#6-fact_estado_resultados)
+4. [fact_balance](#4-fact_balance)
+5. [fact_estado_resultados](#5-fact_estado_resultados)
 
 ### Tablas de Dimensiones (Dimensions)
-7. [dim_fecha](#7-dim_fecha)
-8. [dim_usuario](#8-dim_usuario)
-9. [dim_producto](#9-dim_producto)
-10. [dim_cliente](#10-dim_cliente)
-11. [dim_orden](#11-dim_orden)
-12. [dim_promocion](#12-dim_promocion)
-13. [dim_impuestos](#13-dim_impuestos)
-14. [dim_almacen](#14-dim_almacen)
-15. [dim_proveedor](#15-dim_proveedor)
-16. [dim_tipo_movimiento](#16-dim_tipo_movimiento)
-17. [dim_cuenta_contable](#17-dim_cuenta_contable)
-18. [dim_centro_costo](#18-dim_centro_costo)
-19. [dim_tipo_transaccion](#19-dim_tipo_transaccion)
-20. [dim_periodo](#20-dim_periodo)
+6. [dim_fecha](#6-dim_fecha)
+7. [dim_usuario](#7-dim_usuario)
+8. [dim_producto](#8-dim_producto)
+9. [dim_cliente](#9-dim_cliente)
+10. [dim_orden](#10-dim_orden)
+11. [dim_promocion](#11-dim_promocion)
+12. [dim_impuestos](#12-dim_impuestos)
+13. [dim_almacen](#13-dim_almacen)
+14. [dim_proveedor](#14-dim_proveedor)
+15. [dim_tipo_movimiento](#15-dim_tipo_movimiento)
+16. [dim_cuenta_contable](#16-dim_cuenta_contable)
+17. [dim_centro_costo](#17-dim_centro_costo)
+18. [dim_tipo_transaccion](#18-dim_tipo_transaccion)
+19. [dim_periodo](#19-dim_periodo)
 
 ---
 
@@ -130,35 +129,7 @@
 
 ---
 
-## 4. fact_promocion_aplicada
-
-**Tipo de tabla:** Hechos  
-**Nombre:** fact_promocion_aplicada  
-**Nombre visual:** Promociones Aplicadas  
-**Descripción:** Registra las promociones aplicadas a órdenes específicas. Permite analizar el uso y efectividad de promociones y descuentos.  
-**Valores nulos:** Campos opcionales pueden ser nulos si no hay promoción aplicada.
-
-### Atributos
-
-| Nombre del atributo | Descripción | Tipo de dato | Tabla origen | Columna origen | Origen del dato / Comentario |
-|---------------------|-------------|--------------|--------------|----------------|------------------------------|
-| sk_promocion_aplicada | Surrogate key (PK) | SERIAL | — | — | Generado automáticamente por PostgreSQL |
-| id_promocion_aplicada | ID de aplicación original | INT | oro_promotion_applied | id | ID de la aplicación en OroCommerce |
-| sk_orden | Surrogate key de orden | INT | dim_orden | orden_id | FK al surrogate key de la orden |
-| id_orden | ID externo de la orden | INT | oro_order | id | ID original de la orden en OroCommerce |
-| orden_numero | Número de orden | VARCHAR(100) | oro_order | identifier | Identificador público de la orden |
-| sk_promocion | Surrogate key de promoción | INT | dim_promocion | sk_promocion | FK al surrogate key de la promoción |
-| nombre_promocion | Nombre de la promoción | VARCHAR(500) | oro_promotion | serialized_data->>'nombre' | Nombre de la promoción aplicada |
-| tipo | Tipo de promoción | VARCHAR(50) | oro_promotion | serialized_data->>'codigo' | Tipo o código de la promoción |
-| activa | Promoción activa | BOOLEAN | oro_promotion | — | TRUE si la promoción está vigente |
-| total_orden | Total de la orden | NUMERIC(19,4) | oro_order | total_value | Monto total de la orden |
-| descuentos_orden | Descuentos aplicados | NUMERIC(19,4) | oro_order | total_discounts_amount | Monto total de descuentos |
-| fecha_aplicacion | Fecha de aplicación | TIMESTAMP | oro_promotion_applied | created_at | Fecha cuando se aplicó la promoción |
-| fecha_carga | Fecha de carga en DW | TIMESTAMP | — | — | Timestamp del momento de la carga ETL |
-
----
-
-## 5. fact_balance
+## 4. fact_balance
 
 **Tipo de tabla:** Hechos  
 **Nombre:** fact_balance  
@@ -182,7 +153,7 @@
 
 ---
 
-## 6. fact_estado_resultados
+## 5. fact_estado_resultados
 
 **Tipo de tabla:** Hechos  
 **Nombre:** fact_estado_resultados  
@@ -210,7 +181,7 @@
 
 # TABLAS DE DIMENSIONES
 
-## 7. dim_fecha
+## 6. dim_fecha
 
 **Tipo de tabla:** Dimensión  
 **Nombre:** dim_fecha  
@@ -239,7 +210,7 @@
 
 ---
 
-## 8. dim_usuario
+## 7. dim_usuario
 
 **Tipo de tabla:** Dimensión  
 **Nombre:** dim_usuario  
@@ -262,7 +233,7 @@
 
 ---
 
-## 9. dim_producto
+## 8. dim_producto
 
 **Tipo de tabla:** Dimensión  
 **Nombre:** dim_producto  
@@ -290,7 +261,7 @@
 
 ---
 
-## 10. dim_cliente
+## 9. dim_cliente
 
 **Tipo de tabla:** Dimensión  
 **Nombre:** dim_cliente  
@@ -316,7 +287,7 @@
 
 ---
 
-## 11. dim_orden
+## 10. dim_orden
 
 **Tipo de tabla:** Dimensión  
 **Nombre:** dim_orden  
@@ -339,7 +310,7 @@
 
 ---
 
-## 12. dim_promocion
+## 11. dim_promocion
 
 **Tipo de tabla:** Dimensión  
 **Nombre:** dim_promocion  
@@ -363,7 +334,7 @@
 
 ---
 
-## 13. dim_impuestos
+## 12. dim_impuestos
 
 **Tipo de tabla:** Dimensión  
 **Nombre:** dim_impuestos  
@@ -383,7 +354,7 @@
 
 ---
 
-## 14. dim_almacen
+## 13. dim_almacen
 
 **Tipo de tabla:** Dimensión  
 **Nombre:** dim_almacen  
@@ -407,7 +378,7 @@
 
 ---
 
-## 15. dim_proveedor
+## 14. dim_proveedor
 
 **Tipo de tabla:** Dimensión  
 **Nombre:** dim_proveedor  
@@ -432,7 +403,7 @@
 
 ---
 
-## 16. dim_tipo_movimiento
+## 15. dim_tipo_movimiento
 
 **Tipo de tabla:** Dimensión  
 **Nombre:** dim_tipo_movimiento  
@@ -454,7 +425,7 @@
 
 ---
 
-## 17. dim_cuenta_contable
+## 16. dim_cuenta_contable
 
 **Tipo de tabla:** Dimensión  
 **Nombre:** dim_cuenta_contable  
@@ -478,7 +449,7 @@
 
 ---
 
-## 18. dim_centro_costo
+## 17. dim_centro_costo
 
 **Tipo de tabla:** Dimensión  
 **Nombre:** dim_centro_costo  
@@ -500,7 +471,7 @@
 
 ---
 
-## 19. dim_tipo_transaccion
+## 18. dim_tipo_transaccion
 
 **Tipo de tabla:** Dimensión  
 **Nombre:** dim_tipo_transaccion  
@@ -522,7 +493,7 @@
 
 ---
 
-## 20. dim_periodo
+## 19. dim_periodo
 
 **Tipo de tabla:** Dimensión  
 **Nombre:** dim_periodo  
