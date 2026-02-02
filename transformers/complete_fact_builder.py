@@ -568,10 +568,10 @@ class CompleteFactBuilder:
         logger.info("📦 Construyendo fact_inventario desde CSV...")
 
         csv_path = ROOT / "data" / "inputs" / "inventario" / "movimientos_inventario.csv"
-        df = pd.read_csv(csv_path)
+        df = pd.read_csv(csv_path)  # CSV usa comas como separador
         logger.info(f"   📥 {len(df):,} movimientos cargados desde CSV")
 
-        # Convertir fecha a fecha_id
+        # Convertir fecha a fecha_id (formato YYYY-MM-DD del CSV)
         df["fecha_id"] = pd.to_datetime(df["fecha_movimiento"]).dt.strftime("%Y%m%d").astype(int)
         
         # Cargar dimensiones
@@ -637,10 +637,10 @@ class CompleteFactBuilder:
         df["observaciones"] = df["observaciones"].fillna("")
         df["created_at"] = pd.Timestamp.now()
         
-        # Convertir costo_unitario y costo_total a valores absolutos para reportes
+        # Convertir costo_unitario y costo_total a numéricos y valores absolutos para reportes
         # La cantidad mantiene el signo (+ entrada, - salida)
-        df["costo_unitario"] = df["costo_unitario"].abs()
-        df["costo_total"] = df["costo_total"].abs()
+        df["costo_unitario"] = pd.to_numeric(df["costo_unitario"], errors='coerce').abs()
+        df["costo_total"] = pd.to_numeric(df["costo_total"], errors='coerce').abs()
         
         # RECALCULAR STOCKS: ordenar por producto, almacén y fecha
         logger.info("   🔄 Recalculando stocks secuencialmente...")
