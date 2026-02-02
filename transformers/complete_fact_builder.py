@@ -471,9 +471,14 @@ class CompleteFactBuilder:
             df["sk_promocion"] = 1
 
         # Seleccionar columnas finales (nota: fact_ventas usa sk_promocion)
-        # venta_id NO se incluye porque es SERIAL (autogenerado por la DB)
+        # Incluimos venta_id como identificador único basado en line_item_id_externo
         # Incluimos line_item_id_externo para trazabilidad completa
+        
+        # Generar venta_id como secuencia única basada en line_item_id_externo
+        df["venta_id"] = df["line_item_id_externo"]
+        
         fact_cols = [
+            "venta_id",  # Identificador único de la venta (basado en line_item_id)
             "fecha_id",
             "cliente_id",
             "producto_id",
@@ -558,7 +563,7 @@ class CompleteFactBuilder:
     def build_fact_inventario(self) -> pd.DataFrame:
         """
         Construir fact_inventario desde CSV movimientos_inventario.csv
-        (Ya contiene entradas y salidas con signos correctos)
+        (CSV generado desde ventas reales de OroCommerce)
         """
         logger.info("📦 Construyendo fact_inventario desde CSV...")
 
@@ -631,6 +636,56 @@ class CompleteFactBuilder:
         df["documento"] = df["numero_documento"]
         df["observaciones"] = df["observaciones"].fillna("")
         df["created_at"] = pd.Timestamp.now()
+        
+        # Convertir costo_unitario y costo_total a valores absolutos para reportes
+        # La cantidad mantiene el signo (+ entrada, - salida)
+        df["costo_unitario"] = df["costo_unitario"].abs()
+        df["costo_total"] = df["costo_total"].abs()
+        
+        # RECALCULAR STOCKS: ordenar por producto, almacén y fecha
+        logger.info("   🔄 Recalculando stocks secuencialmente...")
+        df = df.sort_values(['producto_id', 'almacen_id', 'fecha_movimiento']).reset_index(drop=True)
+        
+        # Recalcular stock_anterior y stock_resultante de forma secuencial
+        stocks = {}  # (producto_id, almacen_id) -> stock_actual
+        ajustes = 0
+        
+        for idx in df.index:
+            producto_id = df.at[idx, 'producto_id']
+            almacen_id = df.at[idx, 'almacen_id']
+            cantidad = df.at[idx, 'cantidad']
+            key = (producto_id, almacen_id)
+            
+            # Stock anterior es el stock actual del almacén
+            if key not in stocks:
+                # Primera transacción: usar stock_anterior del CSV como inicial
+                stocks[key] = max(0, df.at[idx, 'stock_anterior'])  # No permitir stock inicial negativo
+            
+            stock_anterior = stocks[key]
+            
+            # VALIDACIÓN: No permitir salidas mayores al stock disponible
+            if cantidad < 0 and abs(cantidad) > stock_anterior:
+                # Ajustar la salida al stock disponible
+                cantidad_ajustada = -stock_anterior
+                ajustes += 1
+                df.at[idx, 'cantidad'] = cantidad_ajustada
+                cantidad = cantidad_ajustada
+            
+            stock_resultante = stock_anterior + cantidad
+            
+            # Asegurar que el stock resultante nunca sea negativo
+            stock_resultante = max(0, stock_resultante)
+            
+            # Actualizar el DataFrame
+            df.at[idx, 'stock_anterior'] = stock_anterior
+            df.at[idx, 'stock_resultante'] = stock_resultante
+            
+            # Actualizar el stock actual para la siguiente transacción
+            stocks[key] = stock_resultante
+        
+        logger.info(f"   ✓ Stocks recalculados para {len(stocks)} combinaciones producto-almacén")
+        if ajustes > 0:
+            logger.warning(f"   ⚠️  {ajustes} movimientos ajustados por stock insuficiente")
         
         # Seleccionar columnas finales (sin movimiento_id, es SERIAL)
         result = df[[
@@ -715,8 +770,24 @@ class CompleteFactBuilder:
         
         logger.info(f"   📊 Órdenes agrupadas: {len(df_ventas):,}")
 
-        # Estimar costo (40% del subtotal - margen aproximado 60%)
-        df_ventas["costo_venta"] = (df_ventas["subtotal"] * 0.40).round(2)
+        # Obtener costos REALES desde fact_ventas (que tiene los costos correctos)
+        logger.info("   💰 Obteniendo costos reales desde fact_ventas...")
+        try:
+            query_costos = """
+            SELECT 
+                orden_id,
+                SUM(costo_total) as costo_venta
+            FROM fact_ventas
+            GROUP BY orden_id
+            """
+            df_costos = pd.read_sql_query(query_costos, self.dw_conn)
+            df_ventas = df_ventas.merge(df_costos, on='orden_id', how='left')
+            df_ventas['costo_venta'] = df_ventas['costo_venta'].fillna(0.0)
+            logger.info(f"   ✓ Costos obtenidos para {(df_ventas['costo_venta'] > 0).sum()} órdenes")
+        except Exception as e:
+            logger.warning(f"   ⚠️  No se pudieron obtener costos desde fact_ventas: {e}")
+            # Fallback: estimar costo (40% del subtotal)
+            df_ventas["costo_venta"] = (df_ventas["subtotal"] * 0.40).round(2)
 
         # Convertir fecha a fecha_id
         df_ventas["fecha_id"] = (
