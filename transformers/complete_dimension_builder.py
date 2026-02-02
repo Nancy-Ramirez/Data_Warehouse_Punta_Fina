@@ -198,7 +198,7 @@ class CompleteDimensionBuilder:
         """Construir dim_producto desde oro_product con precios y costos reales"""
         logger.info("📦 Construyendo dim_producto...")
 
-        # Extraer productos base con categoría real de oro_catalog_category
+        # Extraer productos base - marca viene de oro_catalog_category
         query = """
         SELECT 
             p.id as producto_id,
@@ -208,7 +208,7 @@ class CompleteDimensionBuilder:
             p.type as tipo,
             p.created_at,
             CASE WHEN p.status = 'enabled' THEN true ELSE false END as activo,
-            COALESCE(c.title, 'Sin Categoría') as categoria
+            COALESCE(c.title, 'Sin Marca') as marca
         FROM oro_product p
         LEFT JOIN oro_catalog_category c ON p.category_id = c.id
         ORDER BY p.id
@@ -227,8 +227,8 @@ class CompleteDimensionBuilder:
         ].astype(str)
 
         df["descripcion"] = df["nombre"]
-        # categoria ya viene del JOIN, no sobrescribir
-        df["marca"] = df["nombre"].str.split().str[0].fillna("Sin Marca")
+        # categoria se extrae de la primera palabra del nombre del producto
+        df["categoria"] = df["nombre"].str.split().str[0].fillna("Sin Categoría")
         df["unidad_medida"] = "Pieza"
 
         # Obtener precios desde oro_price_product (precio de venta)
@@ -301,6 +301,7 @@ class CompleteDimensionBuilder:
         )
 
         # Para productos sin costo, estimar basándose en precio (margen ~60%)
+        # IMPORTANTE: precio_base viene con IVA, hay que quitarlo primero
         mask_sin_costo = (df["costo_estandar"] == 0) & (df["precio_base"] > 0)
         df.loc[mask_sin_costo, "costo_estandar"] = (
             df.loc[mask_sin_costo, "precio_base"] * 0.4
@@ -1022,8 +1023,8 @@ class CompleteDimensionBuilder:
             columns={
                 "id_cuenta": "codigo",
                 "nombre_cuenta": "nombre",
-                "clasificacion": "categoria",
-                "naturaleza": "tipo",
+                "tipo_cuenta": "categoria",  # activo, pasivo, patrimonio, ingreso, etc.
+                "naturaleza": "tipo",  # deudora, acreedora
                 "activa": "activo",
             }
         )
@@ -1048,7 +1049,7 @@ class CompleteDimensionBuilder:
         df["nombre"] = df["nombre"].fillna("Sin nombre").astype(str)
         df["descripcion"] = df["descripcion"].fillna("Sin descripción").astype(str)
         df["tipo"] = df["tipo"].fillna("Sin tipo").astype(str)
-        df["categoria"] = df["categoria"].fillna("").astype(str)
+        df["categoria"] = df["categoria"].fillna("General").astype(str)
         df["nivel"] = pd.to_numeric(df["nivel"], errors="coerce").fillna(1).astype(int)
         # cuenta_padre puede tener NaN (floats) - convertir a string vacío
         df["cuenta_padre"] = df["cuenta_padre"].fillna("").astype(str)
@@ -1057,6 +1058,9 @@ class CompleteDimensionBuilder:
         df["activo"] = df["activo"].apply(
             lambda x: x in [True, "TRUE", "true", 1, "1", "activa"]
         )
+        
+        # Capitalizar categorías para mejor presentación
+        df["categoria"] = df["categoria"].str.capitalize()
 
         logger.info(
             f"✓ dim_cuenta_contable: {len(df):,} registros desde CSV (sin nulos)"
