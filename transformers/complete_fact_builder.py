@@ -809,7 +809,7 @@ class CompleteFactBuilder:
         cuenta_bancos = cuenta_map.get("1102", 1)      # Bancos (Activo)
         cuenta_iva = cuenta_map.get("2102", 1)         # IVA por Pagar (Pasivo)
         cuenta_costo = cuenta_map.get("5101", 1)       # Costo de Ventas (Gasto)
-        cuenta_inventario = cuenta_map.get("1103", 1)  # Inventario (Activo)
+        cuenta_inventario = cuenta_map.get("1104", 1)  # Inventario de Mercadería (Activo)
 
         # Cargar tipo_transaccion desde DW
         dim_tipo = pd.read_sql_query(
@@ -949,6 +949,24 @@ class CompleteFactBuilder:
         
         # Calcular periodo_id desde fecha_id (YYYYMMDD -> YYYYMM)
         df["periodo_id"] = (df["fecha_id"] // 100).astype(int)
+
+        # ✅ VALIDAR CUADRE CONTABLE (débitos = créditos por asiento)
+        logger.info("   🔍 Validando cuadre contable...")
+        df_cuadre = df.groupby('numero_asiento').apply(
+            lambda x: pd.Series({
+                'debitos': x[x['tipo_movimiento'] == 'DEBITO']['monto'].sum(),
+                'creditos': x[x['tipo_movimiento'] == 'CREDITO']['monto'].sum()
+            })
+        )
+        df_cuadre['diferencia'] = (df_cuadre['debitos'] - df_cuadre['creditos']).abs()
+        asientos_descuadrados = df_cuadre[df_cuadre['diferencia'] > 0.01]
+        
+        if len(asientos_descuadrados) > 0:
+            logger.error(f"   ❌ {len(asientos_descuadrados)} asientos descuadrados:")
+            for asiento, row in asientos_descuadrados.head(5).iterrows():
+                logger.error(f"      {asiento}: Débitos=${row['debitos']:.2f}, Créditos=${row['creditos']:.2f}, Diferencia=${row['diferencia']:.2f}")
+        else:
+            logger.info(f"   ✅ Todos los asientos cuadran correctamente")
 
         logger.info(f"   ✅ fact_transacciones: {len(df):,} asientos generados")
         logger.info(
@@ -1302,10 +1320,123 @@ class CompleteFactBuilder:
 
         return result
 
+    def validar_integridad_finanzas(self) -> Dict[str, Any]:
+        """
+        Validar integridad de datos de finanzas.
+        Verifica que:
+        - Todas las cuentas contables existen en dim_cuenta_contable
+        - Todos los asientos cuadran (débitos = créditos)
+        - Los saldos por período son coherentes
+        """
+        logger.info("🔍 Validando integridad de datos de finanzas...")
+        
+        validaciones = {
+            'valido': True,
+            'errores': [],
+            'advertencias': []
+        }
+        
+        try:
+            # 1. Verificar que existen cuentas contables
+            df_cuentas = pd.read_sql_query(
+                "SELECT COUNT(*) as total FROM dim_cuenta_contable", 
+                self.dw_conn
+            )
+            if df_cuentas['total'].iloc[0] == 0:
+                validaciones['errores'].append("No hay cuentas contables en dim_cuenta_contable")
+                validaciones['valido'] = False
+            else:
+                logger.info(f"   ✓ {df_cuentas['total'].iloc[0]} cuentas contables encontradas")
+            
+            # 2. Verificar cuadre de asientos en fact_transacciones
+            query_cuadre = """
+            SELECT 
+                numero_asiento,
+                SUM(CASE WHEN tipo_movimiento = 'DEBITO' THEN monto ELSE 0 END) as debitos,
+                SUM(CASE WHEN tipo_movimiento = 'CREDITO' THEN monto ELSE 0 END) as creditos,
+                ABS(
+                    SUM(CASE WHEN tipo_movimiento = 'DEBITO' THEN monto ELSE 0 END) -
+                    SUM(CASE WHEN tipo_movimiento = 'CREDITO' THEN monto ELSE 0 END)
+                ) as diferencia
+            FROM fact_transacciones
+            GROUP BY numero_asiento
+            HAVING ABS(
+                SUM(CASE WHEN tipo_movimiento = 'DEBITO' THEN monto ELSE 0 END) -
+                SUM(CASE WHEN tipo_movimiento = 'CREDITO' THEN monto ELSE 0 END)
+            ) > 0.01
+            """
+            
+            df_descuadres = pd.read_sql_query(query_cuadre, self.dw_conn)
+            if len(df_descuadres) > 0:
+                validaciones['errores'].append(
+                    f"{len(df_descuadres)} asientos descuadrados en fact_transacciones"
+                )
+                validaciones['valido'] = False
+                for idx, row in df_descuadres.head(5).iterrows():
+                    logger.error(
+                        f"   ❌ {row['numero_asiento']}: Débitos=${row['debitos']:.2f}, "
+                        f"Créditos=${row['creditos']:.2f}, Diferencia=${row['diferencia']:.2f}"
+                    )
+            else:
+                logger.info("   ✓ Todos los asientos cuadran correctamente")
+            
+            # 3. Verificar totales globales
+            query_totales = """
+            SELECT 
+                COUNT(*) as total_transacciones,
+                SUM(CASE WHEN tipo_movimiento = 'DEBITO' THEN monto ELSE 0 END) as total_debitos,
+                SUM(CASE WHEN tipo_movimiento = 'CREDITO' THEN monto ELSE 0 END) as total_creditos
+            FROM fact_transacciones
+            """
+            df_totales = pd.read_sql_query(query_totales, self.dw_conn)
+            
+            if len(df_totales) > 0 and df_totales['total_transacciones'].iloc[0] > 0:
+                total_deb = df_totales['total_debitos'].iloc[0]
+                total_cred = df_totales['total_creditos'].iloc[0]
+                diferencia_global = abs(total_deb - total_cred)
+                
+                logger.info(f"   📊 Total transacciones: {df_totales['total_transacciones'].iloc[0]:,}")
+                logger.info(f"   💰 Total débitos: ${total_deb:,.2f}")
+                logger.info(f"   💰 Total créditos: ${total_cred:,.2f}")
+                
+                if diferencia_global > 0.01:
+                    validaciones['errores'].append(
+                        f"Diferencia global: ${diferencia_global:.2f}"
+                    )
+                    validaciones['valido'] = False
+                else:
+                    logger.info("   ✅ Balance global cuadrado")
+            
+            # 4. Verificar que no hay valores nulos en campos críticos
+            query_nulos = """
+            SELECT 
+                COUNT(*) FILTER (WHERE fecha_id IS NULL) as nulos_fecha,
+                COUNT(*) FILTER (WHERE cuenta_id IS NULL) as nulos_cuenta,
+                COUNT(*) FILTER (WHERE monto IS NULL) as nulos_monto,
+                COUNT(*) FILTER (WHERE tipo_movimiento IS NULL) as nulos_tipo_mov
+            FROM fact_transacciones
+            """
+            df_nulos = pd.read_sql_query(query_nulos, self.dw_conn)
+            
+            total_nulos = df_nulos.iloc[0].sum()
+            if total_nulos > 0:
+                validaciones['advertencias'].append(f"Hay {total_nulos} valores nulos en campos críticos")
+                for col in df_nulos.columns:
+                    if df_nulos[col].iloc[0] > 0:
+                        logger.warning(f"   ⚠️  {col}: {df_nulos[col].iloc[0]} nulos")
+            
+        except Exception as e:
+            validaciones['errores'].append(f"Error al validar: {str(e)}")
+            validaciones['valido'] = False
+            logger.error(f"   ❌ Error en validación: {e}")
+        
+        return validaciones
+
     def __del__(self):
         """Cerrar conexiones"""
         try:
             self.oro_conn.close()
-            self.dw_conn.close()
+            if self._owns_dw_conn and self.dw_conn:
+                self.dw_conn.close()
         except:
             pass

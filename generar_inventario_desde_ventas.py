@@ -37,7 +37,7 @@ SELECT
     o.created_at::date as fecha_movimiento,
     oli.product_id as id_producto,
     CAST(oli.quantity AS INTEGER) as cantidad,
-    CAST(oli.value AS NUMERIC(10,2)) as precio_unitario,
+    CAST(oli.value / NULLIF(oli.quantity, 0) AS NUMERIC(10,2)) as precio_unitario,
     oli.id as line_item_id,
     o.id as orden_id
 FROM oro_order o
@@ -51,16 +51,10 @@ ORDER BY o.created_at, oli.id
 df_ventas = pd.read_sql_query(query_ventas, oro_conn)
 print(f"   📥 {len(df_ventas):,} Ventas")
 
-# Obtener costos de dim_producto
-query_costos = """
-SELECT producto_id, costo_estandar 
-FROM dim_producto
-"""
-df_costos = pd.read_sql_query(query_costos, dw_conn)
-
-# Merge con costos
-df_ventas = df_ventas.merge(df_costos, left_on='id_producto', right_on='producto_id', how='left')
-df_ventas['costo_unitario'] = df_ventas['costo_estandar'].fillna(0.0)
+# Calcular costo como 40% del precio de venta
+# IMPORTANTE: oro_order_line_item.value YA está SIN IVA
+# No dividir por 1.13 porque ya está neto
+df_ventas['costo_unitario'] = df_ventas['precio_unitario'] * 0.4  # Costo es 40% del precio (ya sin IVA)
 
 # Crear movimientos de salida (cantidad negativa)
 df_ventas['cantidad_mov'] = -df_ventas['cantidad']
@@ -122,6 +116,8 @@ for idx in df_ventas.index:
     # PRIMERA COMPRA: Si nunca ha comprado, hacer compra inicial
     if ultima_compra[key] is None:
         cantidad_a_comprar = cantidad_compra_inicial
+        # Costo de compra = 40% del precio de venta (precio_unitario ya es sin IVA)
+        costo_compra = df_ventas.at[idx, 'precio_unitario'] * 0.4
         
         movimientos.append({
             'id_producto': producto,
@@ -132,8 +128,8 @@ for idx in df_ventas.index:
             'id_usuario': 1,
             'numero_documento': f'COMP-{compra_counter:06d}',
             'cantidad': cantidad_a_comprar,
-            'costo_unitario': costo_unit,
-            'costo_total': cantidad_a_comprar * costo_unit,
+            'costo_unitario': costo_compra,
+            'costo_total': cantidad_a_comprar * costo_compra,
             'stock_anterior': 0,  # CERO inicial
             'stock_resultante': cantidad_a_comprar,
             'motivo': 'Compra inicial',
@@ -153,6 +149,9 @@ for idx in df_ventas.index:
         cantidad_a_comprar = min(cantidad_compra_normal, espacio_disponible)
         
         if cantidad_a_comprar >= 50:  # Solo comprar si vale la pena
+            # Costo de compra = 40% del precio de venta (precio_unitario ya es sin IVA)
+            costo_compra = df_ventas.at[idx, 'precio_unitario'] * 0.4
+            
             movimientos.append({
                 'id_producto': producto,
                 'id_almacen': almacen,
@@ -162,8 +161,8 @@ for idx in df_ventas.index:
                 'id_usuario': 1,
                 'numero_documento': f'COMP-{compra_counter:06d}',
                 'cantidad': cantidad_a_comprar,
-                'costo_unitario': costo_unit,
-                'costo_total': cantidad_a_comprar * costo_unit,
+                'costo_unitario': costo_compra,
+                'costo_total': cantidad_a_comprar * costo_compra,
                 'stock_anterior': stock_actual,
                 'stock_resultante': stock_actual + cantidad_a_comprar,
                 'motivo': 'Compra periódica',
@@ -181,6 +180,9 @@ for idx in df_ventas.index:
         cantidad_a_comprar = min(cantidad_compra_preventiva, espacio_disponible)
         
         if cantidad_a_comprar > 0:
+            # Costo de compra = 40% del precio de venta (precio_unitario ya es sin IVA)
+            costo_compra = df_ventas.at[idx, 'precio_unitario'] * 0.4
+            
             movimientos.append({
                 'id_producto': producto,
                 'id_almacen': almacen,
@@ -190,8 +192,8 @@ for idx in df_ventas.index:
                 'id_usuario': 1,
                 'numero_documento': f'COMP-{compra_counter:06d}',
                 'cantidad': cantidad_a_comprar,
-                'costo_unitario': costo_unit,
-                'costo_total': cantidad_a_comprar * costo_unit,
+                'costo_unitario': costo_compra,
+                'costo_total': cantidad_a_comprar * costo_compra,
                 'stock_anterior': stock_actual,
                 'stock_resultante': stock_actual + cantidad_a_comprar,
                 'motivo': 'Reposición preventiva de stock',
@@ -209,6 +211,9 @@ for idx in df_ventas.index:
         cantidad_urgente = min(faltante, stock_maximo - stock_actual)
         
         if cantidad_urgente > 0:
+            # Costo de compra = 40% del precio de venta (precio_unitario ya es sin IVA)
+            costo_compra = df_ventas.at[idx, 'precio_unitario'] * 0.4
+            
             movimientos.append({
                 'id_producto': producto,
                 'id_almacen': almacen,
@@ -218,8 +223,8 @@ for idx in df_ventas.index:
                 'id_usuario': 1,
                 'numero_documento': f'COMP-URG-{compra_counter:06d}',
                 'cantidad': cantidad_urgente,
-                'costo_unitario': costo_unit,
-                'costo_total': cantidad_urgente * costo_unit,
+                'costo_unitario': costo_compra,
+                'costo_total': cantidad_urgente * costo_compra,
                 'stock_anterior': stock_actual,
                 'stock_resultante': stock_actual + cantidad_urgente,
                 'motivo': 'Compra urgente',

@@ -256,39 +256,45 @@ class CompleteDimensionBuilder:
             logger.warning(f"   ⚠️  No se pudieron obtener precios: {e}")
             df["precio_base"] = 0.0
 
-        # Obtener costos desde CSV de compras
-        logger.info("   📦 Obteniendo costos desde CSV de compras...")
+        # Obtener costos desde CSV de movimientos de inventario (compras reales)
+        logger.info("   📦 Obteniendo costos reales desde movimientos_inventario.csv...")
         try:
-            csv_compras = ROOT / "Compras_Productos_PuntaFina.csv"
-            df_compras = pd.read_csv(csv_compras)
-
-            # Calcular costo promedio por producto
-            df_costos = (
-                df_compras.groupby("Producto_ID")
-                .agg(
-                    {
-                        "Precio_Unitario_USD": "mean",
-                        "Costo_Promedio_USD": "last",  # Tomar el último costo promedio
-                    }
+            csv_movimientos = ROOT / "data" / "inputs" / "inventario" / "movimientos_inventario.csv"
+            if csv_movimientos.exists():
+                df_mov = pd.read_csv(csv_movimientos)
+                
+                # Filtrar solo compras (MOV_ENTRADA) para obtener los costos reales de compra
+                df_compras = df_mov[df_mov['id_tipo_movimiento'].str.contains('ENTRADA', na=False)]
+                
+                # Calcular costo promedio por producto desde las compras reales
+                df_costos = df_compras.groupby('id_producto').agg({
+                    'costo_unitario': 'mean'  # Promedio de costos de compra
+                }).reset_index()
+                
+                df_costos = df_costos.rename(columns={
+                    'id_producto': 'producto_externo_id',
+                    'costo_unitario': 'costo_estandar'
+                })
+                
+                # Merge con productos (producto_externo_id es el ID de OroCommerce)
+                df = df.merge(
+                    df_costos[['producto_externo_id', 'costo_estandar']],
+                    on='producto_externo_id',
+                    how='left',
+                    suffixes=('', '_real')
                 )
-                .reset_index()
-            )
-
-            df_costos = df_costos.rename(
-                columns={
-                    "Producto_ID": "producto_id",
-                    "Costo_Promedio_USD": "costo_estandar",
-                }
-            )
-
-            df = df.merge(
-                df_costos[["producto_id", "costo_estandar"]],
-                on="producto_id",
-                how="left",
-            )
+                
+                # Si hay costo real, usarlo; si no, mantener el costo anterior
+                df['costo_estandar'] = df['costo_estandar_real'].fillna(df.get('costo_estandar', 0.0))
+                df = df.drop(columns=['costo_estandar_real'], errors='ignore')
+                
+                logger.info(f"   ✓ Costos reales obtenidos para {df['costo_estandar'].notna().sum()} productos")
+            else:
+                logger.warning(f"   ⚠️  No se encontró movimientos_inventario.csv")
+                df['costo_estandar'] = df.get('costo_estandar', 0.0)
         except Exception as e:
             logger.warning(f"   ⚠️  No se pudieron obtener costos: {e}")
-            df["costo_estandar"] = 0.0
+            df["costo_estandar"] = df.get("costo_estandar", 0.0)
 
         # Limpiar valores nulos
         df["precio_base"] = df["precio_base"].fillna(0.0)
@@ -300,12 +306,8 @@ class CompleteDimensionBuilder:
             df.loc[mask_sin_precio, "costo_estandar"] * 2.5
         )
 
-        # Para productos sin costo, estimar basándose en precio (margen ~60%)
-        # IMPORTANTE: precio_base viene con IVA, hay que quitarlo primero
-        mask_sin_costo = (df["costo_estandar"] == 0) & (df["precio_base"] > 0)
-        df.loc[mask_sin_costo, "costo_estandar"] = (
-            df.loc[mask_sin_costo, "precio_base"] * 0.4
-        )
+        # ⚠️ NO estimar costo desde precio_base porque oro_price_product tiene precios de "lista"
+        # muy diferentes a los precios reales de venta. Los costos deben venir de movimientos reales.
 
         # Asegurar que el precio base sea coherente con el costo (margen razonable ~60%)
         # Si precio_base > costo_estandar * 5, ajustar a un margen del 60%
